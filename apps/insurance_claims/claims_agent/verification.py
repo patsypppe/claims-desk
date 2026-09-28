@@ -52,6 +52,17 @@ class IdentityVerifier:
             return False
         return not self._require_knowledge or bool(KNOWLEDGE_FACTORS & factors.keys())
 
+    def partial_match(self, state: ConversationState, minimum: int = 2) -> str | None:
+        """The single record matching EVERY supplied factor (>= minimum) - used only to route an OTP."""
+        factors = state.current_values()
+        if len(factors) < minimum:
+            return None
+        policy = state.lookup.policy_number
+        matches = [p for p in self._repo.policyholders
+                   if all(factor_matches(p, f, v) for f, v in factors.items())
+                   and (not policy or policy == p.policy_number)]
+        return matches[0].party_id if len(matches) == 1 else None
+
     def evaluate(self, state: ConversationState) -> VerifyOutcome:
         factors = state.current_values()
         if not self._enough(factors):

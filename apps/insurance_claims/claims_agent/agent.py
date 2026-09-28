@@ -131,12 +131,17 @@ class Agent:
                           authorized_values=authorized_values(ctx))
 
 
-def _registry(repo, clock, settings, email_fails=False, consent_scenario="default", no_guard=False) -> ToolRegistry:
+def _registry(repo, clock, settings, email_fails=False, consent_scenario="default", no_guard=False,
+              otp_codes=None) -> ToolRegistry:
+    from claims_agent.tools.otp import MockOtpService
+
     sequence = repo.consent_scenarios.get(consent_scenario, repo.consent_scenarios["default"])
     return ToolRegistry(repo=repo, clock=clock,
                         verifier=IdentityVerifier(repo, settings.require_knowledge_factor),
                         email_sender=MockEmailSender(fail=email_fails), handoff=MockHandoff(),
-                        consent_service=MockConsentService(sequence), enforce_permissions=not no_guard)
+                        consent_service=MockConsentService(sequence),
+                        otp=MockOtpService(codes=otp_codes, reveal_in_log=settings.mock_otp_reveal),
+                        enforce_permissions=not no_guard)
 
 
 def assemble(*, repo, settings, clock, extraction_llm, responder, registry, validator=None,
@@ -151,9 +156,10 @@ def assemble(*, repo, settings, clock, extraction_llm, responder, registry, vali
 def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, consent_scenario: str = "default",
                          email_fails: bool = False, scripted_analyses: list | None = None,
                          no_validator: bool = False, no_guard: bool = False, responder_llm=None,
-                         leaky_responder: bool = False, guard=None) -> Agent:
+                         leaky_responder: bool = False, guard=None, verification_policy: str = "any3_or_otp",
+                         otp_codes=None) -> Agent:
     settings = Settings(agent_mode="rules" if mode == "rules" else "llm", app_today=today,
-                        consent_scenario=consent_scenario)
+                        consent_scenario=consent_scenario, verification_policy=verification_policy)
     clock = FixedClock(today)
     responder: Responder = TemplateResponder()
     if mode == "fake":
@@ -162,7 +168,8 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
     elif mode == "live":
         env = Settings.from_env()
         settings = Settings(agent_mode="llm", provider=env.provider, api_key=env.api_key, model=env.model,
-                            extraction_model=env.extraction_model, app_today=today, consent_scenario=consent_scenario)
+                            extraction_model=env.extraction_model, app_today=today, consent_scenario=consent_scenario,
+                            verification_policy=verification_policy)
         extraction_llm, live_responder = llm_clients(settings)
         responder = LLMResponder(live_responder)
         guard = guard or build_guard(settings)
@@ -174,7 +181,7 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
         responder_llm = AlwaysLeakyLLM()
     if responder_llm is not None:
         responder = LLMResponder(responder_llm)
-    registry = _registry(repo, clock, settings, email_fails, consent_scenario, no_guard)
+    registry = _registry(repo, clock, settings, email_fails, consent_scenario, no_guard, otp_codes)
     agent = assemble(repo=repo, settings=settings, clock=clock, extraction_llm=extraction_llm,
                      responder=responder, registry=registry, guard=guard)
     if no_validator:

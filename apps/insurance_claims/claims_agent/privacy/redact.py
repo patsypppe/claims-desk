@@ -26,6 +26,7 @@ def _spans(text: str, today: date) -> list[tuple[int, int, str]]:
     spans += [(m.start(), m.end(), "PHONE") for m in lx.PHONE_RE.finditer(text)]
     for pattern in lx.DATE_RES:
         spans += [(m.start(), m.end(), "DOB") for m in pattern.finditer(text) if normalize_dob(m.group(0), today)]
+    spans += [(m.start(), m.end(), "CODE") for m in re.finditer(r"(?<!\d)\d{6}(?!\d)", text)]
     spans += [(m.start(), m.end(), "ID4") for m in lx.FOUR_DIGITS_RE.finditer(text)
               if not 1900 <= int(m.group(0)) <= 2100]
     chosen: list[tuple[int, int, str]] = []

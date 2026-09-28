@@ -154,6 +154,11 @@ RENDERERS = {
     A.ASK_FIELDS: _ask_fields,
     A.OFFER_ALT_FIELD: _offer_alt,
     A.VERIFY_FAILED: lambda ctx: GENERIC_FAILURE,
+    A.OTP_SENT: lambda ctx: ("That's okay, we can confirm it's you another way. If the details you've shared "
+                             "match our records, I've just sent a 6-digit code to the contact details on file. "
+                             "Please read the code back to me."),
+    A.OTP_WRONG: lambda ctx: "That code didn't match. Please check it and read it to me again.",
+    A.OTP_REMIND: lambda ctx: "Please read me the 6-digit code we sent to the contact details on file.",
     A.CONFIRM_CONFLICT: lambda ctx: f"I heard two different values for {FIELD_LABELS[ctx.details['field']]}. "
                                     "Which one is correct?",
     A.REFUSE_THIRD_PARTY: lambda ctx: ("I'm sorry, I can only discuss an account with the policyholder or a "
@@ -203,7 +208,7 @@ PROTECTION = ("We only ask for these details so that nobody else can access your
               "need your full SSN, just the last four digits, and you can use your phone number or email instead.")
 REASSURE = "You're in the right place."
 ONE_STEP = "Let's take it one step at a time."
-VERIFY_ACTIONS = (A.ASK_FIELDS, A.OFFER_ALT_FIELD, A.VERIFY_FAILED)
+VERIFY_ACTIONS = (A.ASK_FIELDS, A.OFFER_ALT_FIELD, A.VERIFY_FAILED, A.OTP_SENT)
 
 
 def emotion_parts(ctx: ResponseContext, body: str) -> list[str]:

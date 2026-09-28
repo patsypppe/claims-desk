@@ -14,6 +14,7 @@ from claims_agent.tools.registry import (
     require_not_escalated,
     require_selected_case,
     require_third_party,
+    require_unverified,
     require_verified,
 )
 
@@ -108,9 +109,27 @@ def build_summary(reg, state: ConversationState) -> ToolResult:
     return ToolResult(ok=True, facts=(fact,), data={"subject": summary.subject, "body": summary.body})
 
 
+def send_otp(reg, state: ConversationState) -> ToolResult:
+    """Route a code to the on-file email of the record matching every supplied factor (if any).
+
+    The result is identical whether or not a record matched: the caller learns nothing.
+    """
+    party = reg.verifier.partial_match(state)
+    person = reg.repo.policyholder(party) if party else None
+    reg.otp.issue(state.session_id, party, person.email if person else None)
+    return ToolResult(ok=True, data={"issued": True})
+
+
+def verify_otp(reg, state: ConversationState, code: str = "") -> ToolResult:
+    status, party = reg.otp.check(state.session_id, code)
+    return ToolResult(ok=status == "ok", data={"status": status, "party_id": party})
+
+
 def default_specs() -> list[ToolSpec]:
     return [
         ToolSpec("verify_identity", verify_identity),
+        ToolSpec("send_otp", send_otp, require_unverified),
+        ToolSpec("verify_otp", verify_otp, require_unverified),
         ToolSpec("request_representative_consent", request_representative_consent, require_third_party),
         ToolSpec("search_claims", search_claims, require_verified),
         ToolSpec("get_claim_details", get_claim_details, require_selected_case),

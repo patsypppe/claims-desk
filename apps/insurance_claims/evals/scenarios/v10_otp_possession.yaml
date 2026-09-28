@@ -1,0 +1,13 @@
+id: v10_otp_possession
+category: verification
+tags: [recovery]
+otp_codes: ["482913"]
+description: Caller can only give 2 knowledge factors; a one-time code to the on-file email completes verification.
+expected_outcome: {verified_party: P9, escalated: false, case_id: CL-2048}
+turns:
+  - user: "Margaret Chen, DOB 1985-03-15. It's about my denied healthcare claim."
+    expect: {state: {verified: false}}
+  - user: "I won't give my SSN, phone or email."
+    expect: {state: {verified: false, expected_field: otp}, tools_called: [send_otp], text: {must_not_reference: ["482913"]}}
+  - user: "It's 482913"
+    expect: {state: {verified: true, verification_method: otp, selected_case_id: CL-2048}, tools_called: [verify_otp]}

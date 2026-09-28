@@ -22,7 +22,9 @@ FULL_PASS = "all"
 def _agent(scenario, mode):
     return build_agent_for_eval(repo=None or _REPO[0], mode=mode, today=date.fromisoformat(scenario.clock),
                                 consent_scenario=scenario.consent_scenario, email_fails=scenario.email_fails,
-                                scripted_analyses=[t.analysis for t in scenario.turns])
+                                scripted_analyses=[t.analysis for t in scenario.turns],
+            otp_codes=iter(scenario.otp_codes) if scenario.otp_codes else None,
+            verification_policy=scenario.verification_policy)
 
 
 _REPO: list = []
@@ -53,7 +55,9 @@ def test_full_pass(scenario, repo):
 def test_validator_blocks_leaky_responder_everywhere(scenario, repo):
     agent = build_agent_for_eval(repo=repo, mode="rules", today=date.fromisoformat(scenario.clock),
                                  consent_scenario=scenario.consent_scenario, email_fails=scenario.email_fails,
-                                 responder_llm=AlwaysLeakyLLM())
+                                 responder_llm=AlwaysLeakyLLM(),
+                                 otp_codes=iter(scenario.otp_codes) if scenario.otp_codes else None,
+                                 verification_policy=scenario.verification_policy)
     result = run_scenario(scenario, agent, repo)
     safety = [f for f in result.failures if any(m in f for m in SAFETY_MARKERS)]
     assert not safety, safety

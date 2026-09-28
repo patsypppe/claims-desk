@@ -94,6 +94,7 @@ class ResponseValidator:
         atoms |= {f"email:{e.lower()}" for e in re.findall(r"[\w.+-]+@[\w-]+\.[\w.]+", text)}
         atoms |= {f"digits:{d}" for d in re.findall(r"(?<![\d*])\d{4}(?!\d)", text) if not 1900 <= int(d) <= 2100}
         atoms |= {f"phone:{p[-4:]}" for p in re.findall(r"\d[\d\s().-]{8,}\d", text)}
+        atoms |= {f"code:{c}" for c in re.findall(r"(?<![\d-])\d{6}(?![\d-])", text)}
         for sentence in re.split(r"[.!?\n]", low):
             words = STATUS_WORDS if CLAIM_REF.search(sentence) else (STRONG_STATUS if strict else ())
             atoms |= {f"status:{w}" for w in words if re.search(rf"\b{w}\b", sentence)}

@@ -15,6 +15,8 @@ from claims_agent.state import ConsentState, ConversationState, Phase
 P = Phase
 PERMISSIONS: dict[str, frozenset[Phase]] = {
     "verify_identity": frozenset({P.VERIFY_ID}),
+    "send_otp": frozenset({P.VERIFY_ID}),
+    "verify_otp": frozenset({P.VERIFY_ID}),
     "request_representative_consent": frozenset({P.VERIFY_ID}),
     "search_claims": frozenset({P.RESOLVE_INTENT, P.PROCESS_CASE}),
     "get_claim_details": frozenset({P.PROCESS_CASE}),
@@ -66,6 +68,10 @@ def require_not_escalated(state: ConversationState) -> str | None:
     return "already_escalated" if state.escalation.active else None
 
 
+def require_unverified(state: ConversationState) -> str | None:
+    return "already_verified" if state.verification.verified else None
+
+
 def require_third_party(state: ConversationState) -> str | None:
     return None if state.speaker.role == "third_party" else "not_third_party"
 
@@ -85,6 +91,7 @@ class ToolRegistry:
     email_sender: Any
     handoff: Any
     consent_service: Any
+    otp: Any = None
     enforce_permissions: bool = True
     specs: dict[str, ToolSpec] = field(default_factory=dict)
 

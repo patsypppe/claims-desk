@@ -63,7 +63,7 @@ class Counters(FrozenModel):
 class Verification(FrozenModel):
     verified: bool = False
     party_id: str | None = None
-    method: Literal["self", "representative"] | None = None
+    method: Literal["self", "representative", "otp", "channel"] | None = None
 
 
 class Speaker(FrozenModel):
@@ -96,7 +96,8 @@ class ConversationState(FrozenModel):
     offer_id: str | None = None
     email_sent: bool = False
     escalation: Escalation = Escalation()
-    expected_field: PiiField | None = None
+    expected_field: PiiField | Literal["otp"] | None = None
+    otp_pending: bool = False
     awaiting_anything_else: bool = False
     last_verification_key: str | None = None
     pending_human_offer: str | None = None

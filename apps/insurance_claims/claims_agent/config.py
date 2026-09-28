@@ -51,6 +51,16 @@ def _int_env(name: str, default: int) -> int:
     return value
 
 
+VERIFICATION_POLICIES = ("any3", "any3_or_otp", "knowledge_plus_otp")
+
+
+def _policy_env() -> str:
+    value = (os.environ.get("VERIFICATION_POLICY") or "any3_or_otp").strip().lower()
+    if value not in VERIFICATION_POLICIES:
+        raise ConfigError(f"VERIFICATION_POLICY must be one of {VERIFICATION_POLICIES}, got {value!r}")
+    return value
+
+
 def _bool_env(name: str, default: bool) -> bool:
     raw = os.environ.get(name)
     if raw is None or raw == "":
@@ -88,6 +98,8 @@ class Settings:
     session_ttl_minutes: int = 30
     guard_enabled: bool = True
     presidio_scan: bool = False
+    verification_policy: str = "any3_or_otp"
+    mock_otp_reveal: bool = False
     prompt_guard_model: str = "meta-llama/llama-prompt-guard-2-86m"
     safeguard_model: str = "openai/gpt-oss-safeguard-20b"
     prompt_guard_threshold: float = 0.9
@@ -132,6 +144,8 @@ class Settings:
             session_ttl_minutes=_int_env("SESSION_TTL_MINUTES", 30),
             guard_enabled=_bool_env("GUARD_ENABLED", True),
             presidio_scan=_bool_env("PRESIDIO_SCAN", True),
+            verification_policy=_policy_env(),
+            mock_otp_reveal=_bool_env("MOCK_OTP_REVEAL", False),
             prompt_guard_model=os.environ.get("PROMPT_GUARD_MODEL") or "meta-llama/llama-prompt-guard-2-86m",
             safeguard_model=os.environ.get("SAFEGUARD_MODEL") or "openai/gpt-oss-safeguard-20b",
         )

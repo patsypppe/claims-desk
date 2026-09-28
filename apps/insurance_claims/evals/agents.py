@@ -29,6 +29,8 @@ def final_factory(repo, mode: str, flags: dict):
         return build_agent_for_eval(
             repo=repo, mode=mode, today=date.fromisoformat(scenario.clock),
             consent_scenario=scenario.consent_scenario, email_fails=scenario.email_fails,
-            scripted_analyses=[t.analysis for t in scenario.turns], **flags)
+            scripted_analyses=[t.analysis for t in scenario.turns],
+            otp_codes=iter(scenario.otp_codes) if scenario.otp_codes else None,
+            verification_policy=scenario.verification_policy, **flags)
 
     return make

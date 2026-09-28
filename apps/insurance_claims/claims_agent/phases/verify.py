@@ -2,6 +2,8 @@
 from claims_agent.controller import ControllerAction as A
 from claims_agent.controller import Decision, StepContext
 from claims_agent.phases import resolve
+import re
+
 from claims_agent.state import ConversationState, Phase, Verification
 from claims_agent.verification import MIN_FACTORS
 
@@ -23,9 +25,12 @@ def factor_key(state: ConversationState) -> str:
     return "|".join(f"{k}={v}" for k, v in items) + f"|policy={state.lookup.policy_number}"
 
 
-def _verified(ctx: StepContext, state: ConversationState, party_id: str) -> Decision:
-    state = state.model_copy(update={"verification": Verification(verified=True, party_id=party_id, method="self"),
-                                     "expected_field": None})
+OTP_CODE_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
+
+
+def _verified(ctx: StepContext, state: ConversationState, party_id: str, method: str = "self") -> Decision:
+    state = state.model_copy(update={"verification": Verification(verified=True, party_id=party_id, method=method),
+                                     "expected_field": None, "otp_pending": False})
     state = ctx.transition(state, Phase.RESOLVE_INTENT, "identity_verified")
     return resolve.handle(ctx, state, just_verified=True)
 
@@ -42,7 +47,39 @@ def failed(ctx: StepContext, state: ConversationState, candidate: str | None) ->
     return ctx.decide(state, A.VERIFY_FAILED, alternatives=alternatives, details={"attempts_left": remaining})
 
 
+def _send_otp(ctx: StepContext, state: ConversationState) -> Decision:
+    ctx.call("send_otp", state)
+    state = state.model_copy(update={"otp_pending": True, "expected_field": "otp"})
+    return ctx.decide(state, A.OTP_SENT)
+
+
+def _otp_turn(ctx: StepContext, state: ConversationState) -> Decision:
+    match = OTP_CODE_RE.search(ctx.text)
+    if not match:
+        return ctx.decide(state, A.OTP_REMIND)
+    result = ctx.call("verify_otp", state, code=match.group(1))
+    status = result.data.get("status")
+    if result.ok and not ctx.ctl.is_locked_out(result.data["party_id"]):
+        return _verified(ctx, state, result.data["party_id"], method="otp")
+    if status == "wrong":
+        return ctx.decide(state, A.OTP_WRONG)
+    state = state.model_copy(update={"otp_pending": False})
+    return failed(ctx, state, None)
+
+
+def _otp_policy_applies(ctx: StepContext, state: ConversationState, refused_now: list[str]) -> bool:
+    policy = ctx.ctl.settings.verification_policy
+    have = len(state.current_values())
+    if policy == "knowledge_plus_otp":
+        return have >= 2
+    if policy == "any3_or_otp":  # possession factor only when knowledge factors can no longer reach 3
+        return have >= 2 and have + len(askable(state)) < MIN_FACTORS
+    return False
+
+
 def handle(ctx: StepContext, state: ConversationState) -> Decision:
+    if state.otp_pending:
+        return _otp_turn(ctx, state)
     if state.speaker.role == "third_party":
         from claims_agent.phases import representative
 
@@ -51,6 +88,9 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
         state = state.model_copy(update={"expected_field": ctx.conflicts[0]})
         return ctx.decide(state, A.CONFIRM_CONFLICT, details={"field": ctx.conflicts[0]})
     factors = state.current_values()
+    refused_now = [c.field for c in ctx.analysis.pii_candidates if c.caller_refused]
+    if _otp_policy_applies(ctx, state, refused_now):
+        return _send_otp(ctx, state)
     key = factor_key(state)
     if len(factors) >= MIN_FACTORS and key != state.last_verification_key:
         state = state.model_copy(update={"last_verification_key": key})
@@ -71,7 +111,6 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
         alternatives = tuple(f for f in ASK_ORDER if f not in state.refused)
         return ctx.decide(state.model_copy(update={"expected_field": None}), A.VERIFY_FAILED,
                           alternatives=alternatives, details={"attempts_left": None})
-    refused_now = [c.field for c in ctx.analysis.pii_candidates if c.caller_refused]
     state = state.model_copy(update={"expected_field": remaining[0] if remaining else None})
     action = A.OFFER_ALT_FIELD if refused_now else A.ASK_FIELDS
     details = {"captured": len(factors), "needed": max(0, MIN_FACTORS - len(factors)),

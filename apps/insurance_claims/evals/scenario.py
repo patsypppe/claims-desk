@@ -43,6 +43,8 @@ class Scenario(BaseModel):
     clock: str = "2026-09-28"
     consent_scenario: str = "default"
     email_fails: bool = False
+    otp_codes: list[str] | None = None
+    verification_policy: str = "any3_or_otp"
     oracle_factors: dict[str, str] | None = None
     expected_outcome: dict[str, Any] = Field(default_factory=dict)
     turns: list[ScenarioTurn]
