@@ -16,7 +16,8 @@ ID_CUE_RE = re.compile(r"(ssn|social|last\s*(?:four|4)|national\s*id|\bid\b|ends
 DOB_CUE_RE = re.compile(r"(dob|date of birth|birth\s*day|birthdate|born)", re.I)
 NAME_CUE_RE = re.compile(
     r"\b(?i:my name is|my name's|name is|i am|i'm|this is|it's)\s+((?:[A-Z][a-zA-Z'-]+)(?:\s+[A-Z][a-zA-Z'-]+){0,3})")
-NAME_STOPWORDS = frozenset({"The", "Not", "Calling", "Here", "Just", "So", "Really", "Very", "Sorry", "Fine", "Ok",
+LEADING_NAME_RE = re.compile(r"^\s*([A-Z][a-z'-]+(?:\s+[A-Z][a-z'-]+){1,3})\s*[,.;]")
+NAME_STOPWORDS = frozenset({"Healthcare", "Claim", "Dental", "Auto", "Hello", "Thanks", "Thank", "The", "Not", "Calling", "Here", "Just", "So", "Really", "Very", "Sorry", "Fine", "Ok",
                             "Okay", "Yes", "No", "Hi", "Hello", "SSN", "DOB", "I", "My", "Your", "Policy", "SYSTEM"})
 CORRECTION_RE = re.compile(r"\b(actually|i meant|correction|sorry,? (?:it'?s|my)|not .{1,30}, it'?s|wait)\b", re.I)
 REFUSAL_RE = re.compile(r"(not (?:going to |gonna )?(?:give|giving|share|sharing|provide|providing)|"

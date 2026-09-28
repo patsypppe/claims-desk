@@ -95,6 +95,7 @@ class ConversationState(FrozenModel):
     escalation: Escalation = Escalation()
     expected_field: PiiField | None = None
     awaiting_anything_else: bool = False
+    last_verification_key: str | None = None
     disclosed_fact_ids: tuple[str, ...] = ()
     degraded: bool = False
 

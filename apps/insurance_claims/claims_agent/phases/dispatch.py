@@ -1,0 +1,36 @@
+"""Top-level per-turn dispatch: global guards first, then the current phase's handler."""
+from claims_agent.audit import AuditEvent
+from claims_agent.controller import ControllerAction as A
+from claims_agent.controller import Decision, StepContext
+from claims_agent.phases import post, process, resolve, verify
+from claims_agent.policy.emotion import strategy_for
+from claims_agent.state import ConversationState, Phase
+
+HANDLERS = {
+    Phase.VERIFY_ID: verify.handle,
+    Phase.RESOLVE_INTENT: resolve.handle,
+    Phase.PROCESS_CASE: process.handle,
+    Phase.POST_PROCESS: post.handle,
+}
+
+
+def _guard_tool_requests(ctx: StepContext, state: ConversationState) -> None:
+    """LLM/caller tool requests never execute directly; forbidden ones are recorded as blocked attempts."""
+    for request in ctx.analysis.tool_requests:
+        if not ctx.ctl.registry.is_permitted(request.name, state.phase):
+            ctx.call(request.name, state)
+
+
+def run(ctx: StepContext, state: ConversationState) -> Decision:
+    analysis = ctx.analysis
+    if analysis.injection_suspected:
+        ctx.events.append(AuditEvent(kind="injection_flagged", detail={"phase": state.phase.value}, turn=state.turn))
+    ctx.emotion = strategy_for(analysis.emotion.label, analysis.emotion.intensity, 0)
+    if state.phase == Phase.ESCALATED:
+        return ctx.decide(state, A.ESCALATED_HOLD)
+    if state.phase == Phase.COMPLETE:
+        return ctx.decide(state, A.CLOSE)
+    _guard_tool_requests(ctx, state)
+    if analysis.requested_action == "request_human":
+        return ctx.escalate(state, "caller_request")
+    return HANDLERS[state.phase](ctx, state)

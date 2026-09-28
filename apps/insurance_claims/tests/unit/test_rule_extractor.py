@@ -146,3 +146,13 @@ def test_fake_llm_replays_script_then_none():
 
 def test_null_llm_always_none():
     assert NullLLM().parse(system="", user="", schema=TurnAnalysis, effort="low", max_tokens=10) is None
+
+
+@pytest.mark.parametrize("text", ["Margaret Chen, DOB 1985-03-16", "Margaret Chen. Born March 15 1985",
+                                  "Margaret Chen, born March 15 1985, SSN ends in 4472."])
+def test_leading_name_without_cue(rx, text):
+    assert fields(rx.analyze(text, None))["name"] == "Margaret Chen"
+
+
+def test_leading_capitalized_phrase_not_name(rx):
+    assert "name" not in fields(rx.analyze("Healthcare Claim, what's the status?", None))

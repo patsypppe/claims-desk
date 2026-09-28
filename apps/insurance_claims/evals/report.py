@@ -12,6 +12,8 @@ def _fmt(metric: dict) -> str:
         return "n/a"
     if metric.get("denominator") is None:
         return str(metric["value"])
+    if "efficiency" in metric:
+        return f"{metric['value']:.2f} turns (efficiency {metric['efficiency']:.0%})"
     return f"{metric['value']:.1%} ({metric['numerator']}/{metric['denominator']})"
 
 
