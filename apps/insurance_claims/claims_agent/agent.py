@@ -37,7 +37,9 @@ class TurnResult(FrozenModel):
 
 class Agent:
     def __init__(self, *, repo: FixtureRepository, settings: Settings, clock, controller: WorkflowController,
-                 extraction_llm: LLMClient, responder: Responder, sessions: SessionStore, validator=None) -> None:
+                 extraction_llm: LLMClient, responder: Responder, sessions: SessionStore, validator=None,
+                 guard=None) -> None:
+        self.guard = guard
         self.repo, self.settings, self.clock, self.controller = repo, settings, clock, controller
         self.extraction_llm, self.responder, self.sessions, self.validator = extraction_llm, responder, sessions, validator
         self.use_llm = not isinstance(extraction_llm, NullLLM)
@@ -57,7 +59,20 @@ class Agent:
         degraded = self.use_llm and llm is None
         if degraded:
             events.append(AuditEvent(kind="llm_degraded", detail={"stage": "extraction"}, turn=state.turn))
+        merged = self._apply_guard(merged, text, state.turn, events)
         return merged, events, degraded
+
+    def _apply_guard(self, analysis: TurnAnalysis, text: str, turn: int, events: list) -> TurnAnalysis:
+        """Classifier signals are OR-ed into flags only; they never grant anything."""
+        if self.guard is None:
+            return analysis
+        verdict = self.guard.assess(text, regex_flag=analysis.injection_suspected)
+        events.append(AuditEvent(kind="guard_scored", turn=turn, detail={
+            "injection_score": verdict.injection_score, "social_engineering": verdict.social_engineering,
+            "category": verdict.category, "error": verdict.error}))
+        return analysis.model_copy(update={
+            "injection_suspected": analysis.injection_suspected or verdict.injection,
+            "social_engineering": analysis.social_engineering or verdict.social_engineering})
 
     def _reject(self, violations, turn: int) -> AuditEvent:
         return AuditEvent(kind="validator_reject", detail={"violations": list(violations)[:10]}, turn=turn)
@@ -112,18 +127,18 @@ def _registry(repo, clock, settings, email_fails=False, consent_scenario="defaul
 
 
 def assemble(*, repo, settings, clock, extraction_llm, responder, registry, validator=None,
-             lockouts: LockoutRegistry | None = None) -> Agent:
+             lockouts: LockoutRegistry | None = None, guard=None) -> Agent:
     controller = WorkflowController(repo=repo, registry=registry, settings=settings, clock=clock,
                                     lockouts=lockouts or LockoutRegistry())
     return Agent(repo=repo, settings=settings, clock=clock, controller=controller, extraction_llm=extraction_llm,
                  responder=responder, sessions=SessionStore(ttl_seconds=settings.session_ttl_minutes * 60),
-                 validator=validator if validator is not None else ResponseValidator(repo))
+                 validator=validator if validator is not None else ResponseValidator(repo), guard=guard)
 
 
 def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, consent_scenario: str = "default",
                          email_fails: bool = False, scripted_analyses: list | None = None,
                          no_validator: bool = False, no_guard: bool = False, responder_llm=None,
-                         leaky_responder: bool = False) -> Agent:
+                         leaky_responder: bool = False, guard=None) -> Agent:
     settings = Settings(agent_mode="rules" if mode == "rules" else "llm", app_today=today,
                         consent_scenario=consent_scenario)
     clock = FixedClock(today)
@@ -137,6 +152,7 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
                             extraction_model=env.extraction_model, app_today=today, consent_scenario=consent_scenario)
         extraction_llm, live_responder = llm_clients(settings)
         responder = LLMResponder(live_responder)
+        guard = guard or build_guard(settings)
     else:
         extraction_llm = NullLLM()
     if leaky_responder:
@@ -147,7 +163,7 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
         responder = LLMResponder(responder_llm)
     registry = _registry(repo, clock, settings, email_fails, consent_scenario, no_guard)
     agent = assemble(repo=repo, settings=settings, clock=clock, extraction_llm=extraction_llm,
-                     responder=responder, registry=registry)
+                     responder=responder, registry=registry, guard=guard)
     if no_validator:
         agent.validator = None
     return agent
@@ -174,6 +190,19 @@ def llm_clients(settings: Settings):
     return AnthropicLLM(client, settings.extraction_model), AnthropicLLM(client, settings.model)
 
 
+def build_guard(settings: Settings):
+    """Groq-hosted classifiers; only when running an LLM mode against Groq and not disabled."""
+    if settings.agent_mode != "llm" or settings.provider != "groq" or not settings.guard_enabled:
+        return None
+    import groq
+
+    from claims_agent.extraction.guard import InjectionGuard
+
+    client = groq.Groq(api_key=settings.api_key.get_secret_value(), timeout=10.0, max_retries=1)
+    return InjectionGuard(client, prompt_guard_model=settings.prompt_guard_model,
+                          safeguard_model=settings.safeguard_model, threshold=settings.prompt_guard_threshold)
+
+
 def build_agent(settings: Settings, repo: FixtureRepository | None = None,
                 lockouts: LockoutRegistry | None = None) -> Agent:
     repo = repo or FixtureRepository.load(settings.fixtures_dir)
@@ -182,4 +211,4 @@ def build_agent(settings: Settings, repo: FixtureRepository | None = None,
     responder = LLMResponder(responder_llm) if responder_llm else TemplateResponder()
     registry = _registry(repo, clock, settings, consent_scenario=settings.consent_scenario)
     return assemble(repo=repo, settings=settings, clock=clock, extraction_llm=extraction_llm, responder=responder,
-                    registry=registry, lockouts=lockouts)
+                    registry=registry, lockouts=lockouts, guard=build_guard(settings))

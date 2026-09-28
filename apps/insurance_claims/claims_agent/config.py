@@ -86,6 +86,10 @@ class Settings:
     require_knowledge_factor: bool = False
     debug_panel: bool = True
     session_ttl_minutes: int = 30
+    guard_enabled: bool = True
+    prompt_guard_model: str = "meta-llama/llama-prompt-guard-2-86m"
+    safeguard_model: str = "openai/gpt-oss-safeguard-20b"
+    prompt_guard_threshold: float = 0.9
 
     def clock(self) -> Clock:
         return FixedClock(self.app_today) if self.app_today else SystemClock()
@@ -125,4 +129,7 @@ class Settings:
             require_knowledge_factor=_bool_env("REQUIRE_KNOWLEDGE_FACTOR", False),
             debug_panel=_bool_env("DEBUG_PANEL", True),
             session_ttl_minutes=_int_env("SESSION_TTL_MINUTES", 30),
+            guard_enabled=_bool_env("GUARD_ENABLED", True),
+            prompt_guard_model=os.environ.get("PROMPT_GUARD_MODEL") or "meta-llama/llama-prompt-guard-2-86m",
+            safeguard_model=os.environ.get("SAFEGUARD_MODEL") or "openai/gpt-oss-safeguard-20b",
         )

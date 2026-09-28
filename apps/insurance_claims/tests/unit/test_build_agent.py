@@ -21,3 +21,16 @@ def test_groq_provider_wires_groq_clients(repo):
     agent = build_agent(Settings(agent_mode="llm", provider="groq", api_key=SecretStr("gsk-test"),
                                  model="openai/gpt-oss-120b", extraction_model="openai/gpt-oss-120b"), repo)
     assert isinstance(agent.extraction_llm, GroqLLM) and isinstance(agent.responder, LLMResponder)
+
+
+def test_groq_mode_wires_guard_by_default(repo):
+    agent = build_agent(Settings(agent_mode="llm", provider="groq", api_key=SecretStr("gsk-test"),
+                                 model="openai/gpt-oss-120b", extraction_model="openai/gpt-oss-20b"), repo)
+    assert agent.guard is not None
+
+
+def test_guard_can_be_disabled_and_is_off_in_rules_mode(repo):
+    assert build_agent(Settings(agent_mode="rules"), repo).guard is None
+    agent = build_agent(Settings(agent_mode="llm", provider="groq", api_key=SecretStr("gsk-test"),
+                                 guard_enabled=False), repo)
+    assert agent.guard is None

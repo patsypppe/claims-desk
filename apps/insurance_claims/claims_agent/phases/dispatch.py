@@ -38,11 +38,16 @@ def _guard_tool_requests(ctx: StepContext, state: ConversationState) -> None:
 
 def run(ctx: StepContext, state: ConversationState) -> Decision:
     analysis = ctx.analysis
-    if analysis.injection_suspected:
+    if analysis.injection_suspected or analysis.social_engineering:
         ctx.events.append(AuditEvent(kind="injection_flagged", detail={"phase": state.phase.value}, turn=state.turn))
+        attempts = state.counters.manipulation_attempts + 1
+        state = state.model_copy(update={"counters": state.counters.model_copy(
+            update={"manipulation_attempts": attempts})})
     heated = state.counters.heated_turns + (1 if analysis.emotion.label in HEATED else 0)
     state = state.model_copy(update={"counters": state.counters.model_copy(update={"heated_turns": heated})})
     ctx.emotion = strategy_for(analysis.emotion.label, analysis.emotion.intensity, heated)
+    if analysis.social_engineering and not state.verification.verified:
+        ctx.emotion = strategy_for("distrust", "medium", 0)  # explain why the protection exists
     if state.phase == Phase.ESCALATED:
         return ctx.decide(state, A.ESCALATED_HOLD)
     if state.phase == Phase.COMPLETE:

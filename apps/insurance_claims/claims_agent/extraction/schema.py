@@ -65,3 +65,4 @@ class TurnAnalysis(_Strict):
                               "other"] = "provide_info"
     tool_requests: list[ToolRequest] = Field(default_factory=list)
     injection_suspected: bool = False
+    social_engineering: bool = False
