@@ -47,4 +47,5 @@ def test_hhem_wrapper_is_optional():
 
 
 def test_conditional_promise_rejected(v, ctx):
-    assert not v.validate("If you send the documents this week, your claim will be approved.", [], ctx, "").ok
+    result = v.validate("If you send the documents this week, it will be approved.", [], ctx, "")
+    assert any(x.startswith("promissory") for x in result.violations)
