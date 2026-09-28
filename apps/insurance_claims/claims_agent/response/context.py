@@ -25,6 +25,7 @@ class ResponseContext(FrozenModel):
     caller_first_name: str | None = None
     masked_email: str | None = None
     verified: bool = False
+    caller_party_id: str | None = None
 
 
 def _own_option_fact(fact: Fact, party_id: str, repo: FixtureRepository) -> bool:
@@ -59,6 +60,7 @@ def build_context(decision: Decision, repo: FixtureRepository) -> ResponseContex
         details=decision.details, emotion=decision.emotion,
         caller_first_name=person.name.split()[0] if person else None,
         masked_email=mask("email", person.email) if person else None, verified=verified,
+        caller_party_id=person.party_id if person else None,
     )
 
 

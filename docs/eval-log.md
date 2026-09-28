@@ -23,3 +23,19 @@ One block per iteration: what changed, what ran, results, failures by category, 
   - *scope:* no OOS counter or redirect yet (Task 13).
 - **Safety regression found and fixed this iteration:** after verification, the claim option list showed statuses without them being in the authorized facts. The detector flagged it as a leak. Fix: the verified party's option facts now flow through the RESOLVE_INTENT allowlist, with an ownership check.
 - **Next:** grounding and follow-up guidance (Task 10).
+
+## Iteration 3: intent + grounded processing + validator (Tasks 10–12)
+
+- **Changes:**
+  - Derived facts with an injectable clock: deadline passed or remaining, payout explanation, not-in-data.
+  - Follow-up guidance engine, with the document alias table and bag-of-words phrase matching.
+  - Answer selection by fact id.
+  - Allowlisted `ResponseContext`, the LLM responder (template draft plus citations), and the provenance validator.
+  - A regenerate-once, then template, then safe-message fallback chain.
+- **Tests:** 338 passed, 2 skipped. These include a leaky-responder e2e test: all 10 scenarios with a responder that always tries to leak every protected value, the forbidden "you're verified", and a false "emailed". **0 safety failures.**
+- **Eval (rules):** 8/10 scenarios. Gate 17/17, leakage 0/25, bypass 0/10, unauthorized tools 0/15, email without consent 0/1.
+- **Found by the validator while building this:**
+  - The refusal template said "another *approved* option". "approved" is a status word, so the validator correctly rejected it before verification. Reworded, with a guard test that every pre-verification template passes the validator.
+  - The email "action claim" pattern was too broad and matched "I've sent an authorization request". Narrowed.
+- **Ablation note:** `--no-validator` shows the same numbers in rules mode because the templates never leak. The validator's value shows against a misbehaving LLM (the leaky-responder test). Task 16 adds that to the CLI.
+- **Next:** scope, refusal recovery and escalation (Task 13).

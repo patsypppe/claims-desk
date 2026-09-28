@@ -77,7 +77,7 @@ def _ask_fields(ctx: ResponseContext) -> str:
 
 
 def _offer_alt(ctx: ResponseContext) -> str:
-    return f"That's okay, we can use another approved option instead. Could you share {_or_list(list(ctx.alternatives)[:2])}?"
+    return f"That's okay, we can use a different verification detail instead. Could you share {_or_list(list(ctx.alternatives)[:2])}?"
 
 
 def _present(ctx: ResponseContext) -> str:

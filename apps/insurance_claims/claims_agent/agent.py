@@ -13,7 +13,9 @@ from claims_agent.extraction.rules import RuleExtractor
 from claims_agent.extraction.schema import TurnAnalysis
 from claims_agent.llm.client import FakeLLM, LLMClient, NullLLM
 from claims_agent.response.context import authorized_values, build_context
+from claims_agent.response.llm_responder import LLMResponder
 from claims_agent.response.responder import Responder, TemplateResponder
+from claims_agent.response.validator import ResponseValidator
 from claims_agent.sessions import LockoutRegistry, SessionStore
 from claims_agent.state import StateSnapshot, snapshot
 from claims_agent.tools.mocks import MockConsentService, MockEmailSender, MockHandoff
@@ -21,6 +23,8 @@ from claims_agent.tools.registry import ToolRegistry
 from claims_agent.verification import IdentityVerifier
 
 MAX_INPUT_CHARS = 2000
+SAFE_FALLBACK = ("I'm sorry, I can't share that right now. I'm here to help with your insurance policy or claim. "
+                 "How can I help?")
 
 
 class TurnResult(FrozenModel):
@@ -54,6 +58,32 @@ class Agent:
             events.append(AuditEvent(kind="llm_degraded", detail={"stage": "extraction"}, turn=state.turn))
         return merged, events, degraded
 
+    def _reject(self, violations, turn: int) -> AuditEvent:
+        return AuditEvent(kind="validator_reject", detail={"violations": list(violations)[:10]}, turn=turn)
+
+    def _respond(self, ctx, text: str, turn: int) -> tuple[str, list[str], list[AuditEvent]]:
+        """Respond -> validate -> (LLM: regenerate once with feedback) -> template -> safe fallback."""
+        reply, cited, events = self.responder.respond(ctx, turn)
+        if self.validator is None:
+            return reply, cited, events
+        result = self.validator.validate(reply, cited, ctx, text)
+        if result.ok:
+            return reply, cited, events
+        events = events + [self._reject(result.violations, turn)]
+        if isinstance(self.responder, LLMResponder):
+            reply, cited, retry_events = self.responder.respond(ctx, turn, feedback=list(result.violations))
+            result = self.validator.validate(reply, cited, ctx, text)
+            events = events + retry_events
+            if result.ok and not retry_events:
+                return reply, cited, events
+            if not result.ok:
+                events.append(self._reject(result.violations, turn))
+        reply, cited, _ = TemplateResponder().respond(ctx, turn)
+        events.append(AuditEvent(kind="fallback_used", detail={"reason": "validator"}, turn=turn))
+        if not self.validator.validate(reply, cited, ctx, text).ok:
+            reply, cited = SAFE_FALLBACK, []
+        return reply, cited, events
+
     def handle(self, session_id: str, text: str) -> TurnResult:
         state = self.sessions.get(session_id)
         text = (text or "")[:MAX_INPUT_CHARS]
@@ -63,10 +93,7 @@ class Agent:
         state = state.model_copy(update={"degraded": degraded})
         decision = self.controller.step(state, analysis, text, conflicts)
         ctx = build_context(decision, self.repo)
-        reply, cited, respond_events = self.responder.respond(ctx, state.turn)
-        if self.validator is not None:
-            reply, validate_events = self.validator.check(reply, cited, ctx, decision.state)
-            respond_events = respond_events + validate_events
+        reply, cited, respond_events = self._respond(ctx, text, state.turn)
         final = decision.state.model_copy(update={
             "disclosed_fact_ids": tuple(dict.fromkeys(decision.state.disclosed_fact_ids + tuple(cited)))})
         self.sessions.save(final)
@@ -89,7 +116,7 @@ def assemble(*, repo, settings, clock, extraction_llm, responder, registry, vali
                                     lockouts=lockouts or LockoutRegistry())
     return Agent(repo=repo, settings=settings, clock=clock, controller=controller, extraction_llm=extraction_llm,
                  responder=responder, sessions=SessionStore(ttl_seconds=settings.session_ttl_minutes * 60),
-                 validator=validator)
+                 validator=validator if validator is not None else ResponseValidator(repo))
 
 
 def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, consent_scenario: str = "default",
@@ -103,8 +130,6 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
         script = [TurnAnalysis.model_validate(a) if a else None for a in (scripted_analyses or [])]
         extraction_llm: LLMClient = FakeLLM(script)
     elif mode == "live":
-        from claims_agent.response.llm_responder import LLMResponder
-
         env = Settings.from_env()
         settings = Settings(agent_mode="llm", api_key=env.api_key, model=env.model,
                             extraction_model=env.extraction_model, app_today=today, consent_scenario=consent_scenario)
@@ -113,12 +138,13 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
     else:
         extraction_llm = NullLLM()
     if responder_llm is not None:
-        from claims_agent.response.llm_responder import LLMResponder
-
         responder = LLMResponder(responder_llm)
     registry = _registry(repo, clock, settings, email_fails, consent_scenario, no_guard)
-    return assemble(repo=repo, settings=settings, clock=clock, extraction_llm=extraction_llm,
-                    responder=responder, registry=registry)
+    agent = assemble(repo=repo, settings=settings, clock=clock, extraction_llm=extraction_llm,
+                     responder=responder, registry=registry)
+    if no_validator:
+        agent.validator = None
+    return agent
 
 
 def llm_clients(settings: Settings):
@@ -135,8 +161,6 @@ def llm_clients(settings: Settings):
 
 def build_agent(settings: Settings, repo: FixtureRepository | None = None,
                 lockouts: LockoutRegistry | None = None) -> Agent:
-    from claims_agent.response.llm_responder import LLMResponder
-
     repo = repo or FixtureRepository.load(settings.fixtures_dir)
     clock = settings.clock()
     extraction_llm, responder_llm = llm_clients(settings)
