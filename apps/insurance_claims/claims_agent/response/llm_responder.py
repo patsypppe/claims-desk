@@ -25,6 +25,7 @@ Style guide (this is how good human agents sound):
 - Empathy: follow emotion.steps exactly. If "acknowledge" is not in the steps, do not apologise or say you
   understand. One empathetic clause is enough; never stack apologies.
 - Use the caller's first name at most once, on the turn they are verified.
+- If speaking_with is "authorized_representative", say "the policyholder's claim/account", never "your".
 - Plain, specific language; no filler ("I'd be happy to", "Certainly!"), no policy jargon, no markdown.
 - template_draft is correct and compliant: keep every fact, question and offer in it (you may drop an offer or
   caveat that previous_agent_replies already contains), but make it sound natural and concise.
@@ -45,6 +46,7 @@ def context_payload(ctx: ResponseContext, draft: str) -> dict:
         "required_elements": list(ctx.required_elements), "alternatives": list(ctx.alternatives),
         "options": list(ctx.options), "details": ctx.details, "caller_first_name": ctx.caller_first_name,
         "masked_email": ctx.masked_email,
+        "speaking_with": "authorized_representative" if ctx.for_representative else "caller",
         "emotion": {"label": ctx.emotion.label, "steps": list(ctx.emotion.steps),
                     "offer_human": ctx.emotion.offer_human, "max_sentences": ctx.emotion.max_sentences},
         "previous_agent_replies": list(ctx.previous_agent_replies),

@@ -64,6 +64,10 @@ def _or_list(items: list[str]) -> str:
     return labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + f", or {labels[-1]}"
 
 
+def _account(ctx: ResponseContext) -> str:
+    return "the policyholder's account" if ctx.for_representative else "your account"
+
+
 def _verified_prefix(ctx: ResponseContext) -> str:
     if ctx.details.get("rep_approved"):
         return ("Thank you. The policyholder has approved your access, so I can help you with their account. ")
@@ -211,15 +215,15 @@ RENDERERS = {
     A.REFUSE_THIRD_PARTY: lambda ctx: ("I'm sorry, I can only discuss an account with the policyholder or a "
                                        "representative they've authorized. If the policyholder can join the call "
                                        "I'm happy to help, or I can connect you with a member of our team."),
-    A.ASK_INTENT: lambda ctx: f"{_verified_prefix(ctx)}What can I help you with today? I see these claims on your "
-                              f"account: {_options(ctx)}.",
-    A.DISAMBIGUATE_CASE: lambda ctx: (f"{_verified_prefix(ctx)}The only claim I see on your account is the "
+    A.ASK_INTENT: lambda ctx: f"{_verified_prefix(ctx)}What can I help you with today? I see these claims on "
+                              f"{_account(ctx)}: {_options(ctx)}.",
+    A.DISAMBIGUATE_CASE: lambda ctx: (f"{_verified_prefix(ctx)}The only claim I see on {_account(ctx)} is the "
                                       f"{ctx.options[0]}. Would you like to discuss it?" if len(ctx.options) == 1 else
                                       f"{_verified_prefix(ctx)}I found more than one claim that could match: "
                                       f"{_options(ctx)}. Which one would you like to discuss?"),
-    A.NO_MATCHING_CASE: lambda ctx: f"{_verified_prefix(ctx)}I don't see that claim on your account. Here's what I "
+    A.NO_MATCHING_CASE: lambda ctx: f"{_verified_prefix(ctx)}I don't see that claim on {_account(ctx)}. Here's what I "
                                     f"do see: {_options(ctx)}. Which one would you like to discuss?",
-    A.NO_CLAIMS: lambda ctx: f"{_verified_prefix(ctx)}I don't see any claims on your account right now. Is there "
+    A.NO_CLAIMS: lambda ctx: f"{_verified_prefix(ctx)}I don't see any claims on {_account(ctx)} right now. Is there "
                              "anything else I can help you with?",
     A.PRESENT_CASE: _present,
     A.ANSWER: _answer,

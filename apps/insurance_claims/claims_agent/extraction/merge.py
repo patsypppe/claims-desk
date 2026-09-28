@@ -59,6 +59,12 @@ def _merge_pii(rules: list[PiiCandidate], llm: list[PiiCandidate], text: str, tu
     return merged, events
 
 
+def _only_subject_relation(relation: str, text: str) -> bool:
+    rel = re.escape(relation.lower())
+    return bool(re.search(rf"\bmy {rel}\b", text, re.I)) and not re.search(
+        rf"\b(?:i'?m|i am) (?:her|his|their|the(?: policyholder'?s)?|\w+'s) {rel}\b", text, re.I)
+
+
 def _without_dob(text: str, pii: list[PiiCandidate]) -> str:
     """The caller's text minus any date of birth, so a birth month/year never becomes a claim-date hint."""
     for c in pii:
@@ -150,6 +156,11 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
                            date_text=_without_dob(text, rules.pii_candidates + pii))
     relationship = rules.stated_relationship or (
         llm.stated_relationship if _in_text(llm.stated_relationship, text) else None)
+    subject_relation = rules.stated_subject_relation or (
+        llm.stated_subject_relation if _in_text(llm.stated_subject_relation, text) else None)
+    if not rules.stated_relationship and relationship and _only_subject_relation(relationship, text):
+        subject_relation = subject_relation or relationship.lower()  # "my mother" is who the account belongs to,
+        relationship = None                                          # not what the caller is
     speaker = rules.speaker_name or (llm.speaker_name if _in_text(llm.speaker_name, text) else None)
     llm_role = llm.speaker_role
     if llm_role == "third_party" and rules.speaker_role != "third_party" and not lx.THIRD_PARTY_CUE_RE.search(text):
@@ -165,8 +176,7 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
         speaker_role="third_party" if third_party
         else (llm_role if llm_role != "unknown" else rules.speaker_role),
         stated_relationship=relationship,
-        stated_subject_relation=rules.stated_subject_relation or (
-            llm.stated_subject_relation if _in_text(llm.stated_subject_relation, text) else None),
+        stated_subject_relation=subject_relation,
         stated_subject_name=rules.stated_subject_name or (
             llm.stated_subject_name if _in_text(llm.stated_subject_name, text) else None),
         speaker_name=speaker,

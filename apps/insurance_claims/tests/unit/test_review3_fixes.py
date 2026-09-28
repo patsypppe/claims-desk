@@ -148,3 +148,9 @@ def test_statement_after_a_question_does_not_add_asked_attributes():
 def test_readback_refusal_names_identifiers_generically(agent):
     [r] = talk(agent, "What is my email on file?")
     assert "email" in r.reply.lower()
+
+
+def test_representative_hears_about_the_policyholders_account_not_their_own(agent):
+    [r] = talk(agent, "I'm David Chen, calling on behalf of my mother Margaret Chen. Her DOB is 1985-03-15 and her "
+                      "SSN last four is 4472.")
+    assert r.snapshot.verified and "your account" not in r.reply and "policyholder's account" in r.reply

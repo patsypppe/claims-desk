@@ -27,6 +27,7 @@ class ResponseContext(FrozenModel):
     verified: bool = False
     caller_party_id: str | None = None
     previous_agent_replies: tuple[str, ...] = ()  # already-validated replies only; never caller text
+    for_representative: bool = False  # caller is a listed rep: "the policyholder's account", never her first name
 
 
 def _own_option_fact(fact: Fact, party_id: str, repo: FixtureRepository) -> bool:
@@ -53,16 +54,17 @@ def build_context(decision: Decision, repo: FixtureRepository) -> ResponseContex
     state = decision.state
     verified = state.verification.verified
     person = repo.policyholder(state.verification.party_id) if verified else None
+    rep = state.verification.method == "representative"
     return ResponseContext(
         phase=state.phase, action=decision.action, facts=_allowed_facts(decision, repo),
         required_elements=(state.expected_field,) if state.expected_field else (),
         alternatives=decision.alternatives,
         options=tuple(o.display for o in decision.options) if verified else (),
         details=decision.details, emotion=decision.emotion,
-        caller_first_name=person.name.split()[0] if person else None,
+        caller_first_name=person.name.split()[0] if person and not rep else None,
         masked_email=mask("email", person.email) if person else None, verified=verified,
         caller_party_id=person.party_id if person else None,
-        previous_agent_replies=state.recent_replies,
+        previous_agent_replies=state.recent_replies, for_representative=rep,
     )
 
 

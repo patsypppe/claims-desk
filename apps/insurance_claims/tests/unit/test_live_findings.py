@@ -114,3 +114,16 @@ def test_llm_status_hint_without_support_in_text_is_rejected():
 def test_llm_status_hint_with_support_in_text_is_kept():
     from claims_agent.extraction.schema import IntentHintsIn
     assert M("the one they turned down", TurnAnalysis(intent=IntentHintsIn(status="denied"))).intent.status == "denied"
+
+
+def test_llm_my_mother_is_the_subjects_relation_not_the_callers():
+    # live qwen probe C14: stated_relationship="mother" refused the listed son David Chen
+    text = ("I'm David Chen, calling on behalf of my mother Margaret Chen. Her DOB is 1985-03-15 and her SSN "
+            "last four is 4472.")
+    merged = M(text, TurnAnalysis(speaker_role="third_party", speaker_name="David Chen", stated_relationship="mother"))
+    assert merged.stated_relationship != "mother" and merged.stated_subject_relation == "mother"
+
+
+def test_llm_stated_caller_relationship_is_kept():
+    text = "I'm her son David Chen, calling about my mother's claim."
+    assert M(text, TurnAnalysis(speaker_role="third_party", stated_relationship="son")).stated_relationship == "son"
