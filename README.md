@@ -425,10 +425,34 @@ Caveats:
 
 ---
 
+## Production hardening (v2)
+
+Built from the research in `docs/research/2026-09-28-production-landscape.md`. Every item below has tests.
+
+| Area | What it does | Config |
+|---|---|---|
+| **Verification policies** | `any3` (spec default behavior); `any3_or_otp` (default): when knowledge factors can't reach 3, a **one-time code** goes to the on-file email of the record matching every supplied factor; `knowledge_plus_otp`: step-up, ≥2 factors + OTP always. The OTP reply is identical whether or not a record matched (no oracle). Codes allow 3 attempts and expire after 5 minutes. | `VERIFICATION_POLICY`, `MOCK_OTP_REVEAL` |
+| **Pre-authenticated channels** | A portal can start a session with an HMAC-signed `{party_id, exp, nonce}` token. It is verified by a guarded tool (constant-time comparison, expiry, replay protection) and never trusted from chat text. `scripts/mint_channel_token.py` mints demo tokens. | `CHANNEL_SIGNING_KEY` |
+| **PII never reaches the LLM** | DOB, ID digits, phones, emails and codes are replaced with `⟦DOB_1⟧`-style placeholders before the extraction call and restored deterministically; invented placeholders are rejected. The UI **Secure entry** toggle processes a turn fully on-server (no LLM call). | always on |
+| **Injection / social-engineering signals** | Llama Prompt Guard 2 (score) and gpt-oss-safeguard (policy classifier) on Groq. They **only flag** (audit, `manipulation_attempts` counter, "explain protection" reply style) and never change verification. | `GUARD_ENABLED`, `PROMPT_GUARD_MODEL`, `SAFEGUARD_MODEL` |
+| **Presidio second opinion** | The validator also rejects contact details or SSNs detected by Presidio unless they come from allowlisted facts. | `PRESIDIO_SCAN` |
+| **Promise guard** | Replies that promise or speculate about outcomes ("will be approved", "guarantee", conditional promises) are rejected; explicit negations ("I can't promise…") are allowed. | always on |
+| **Durable state** | SQLite sessions and cross-session lockouts (15-minute window), with per-session locks so concurrent requests can't double-send. | `STORAGE=sqlite`, `SQLITE_PATH` |
+| **Timing & API hardening** | Every identity check takes at least `VERIFY_FAILURE_MIN_MS`. Session creation is rate-limited per client. Secure-cookie option. Rate-limit maps are pruned. The debug panel summarizes validator rejections and doesn't expose their internals. | `VERIFY_FAILURE_MIN_MS`, `SESSION_CREATE_LIMIT`, `COOKIE_SECURE`, `APP_ENV` |
+| **Warm handoff** | Escalation tickets carry a masked case summary, the verification method, masked factors and representative authority, so the human doesn't re-verify. A `verification_record` audit event documents how identity was established. | — |
+| **Repair patterns** | "repeat that" re-sends the last validated reply; "start over" keeps verification and clears the thread; "skip this question" declines that field. | — |
+| **Response quality** | Each offer and deadline caveat is made once, empathy is acknowledged once per emotional streak, documents aren't restated, closers vary, repeat explanations are shorter, and the reply model sees its own last 3 validated replies plus a style guide. | — |
+| **Quality metrics** | Deterministic: words per reply, 4-gram repetition, repeated offers, questions per reply, empathy when neutral. The LLM judge runs on a separate model with anchored rubric examples. | `JUDGE_MODEL` |
+| **Eval upgrades** | Ordered `expected_tool_trace`, `end_state` (emails sent, ticket, consent), **pass^k**, transcript → scenario export (`evals/export.py`). | — |
+| **LLM caller simulator** | τ-bench style: 8 persona cards (cooperative, anxious, angry, confused, social engineer, fake prior verification, representative, off-topic). Every simulated conversation is replayed through the same safety invariants; results reported as pass^k. `python -m evals.sim_runner --runs 3` | `SIM_MODEL` |
+| **Red team** | promptfoo config against the live API (`evals/redteam/`), with attack generation on Groq. | `ALLOW_HEADER_SESSIONS` (tooling only) |
+
+---
+
 ## Known limitations
 
 - The regex DOB parser assumes US month/day order for ambiguous numeric dates.
-- Lockouts, sessions and mocks are in memory, so a restart clears them. Email, handoff and consent are mocks.
+- Sessions and lockouts persist with `STORAGE=sqlite`. Per-session locks are process-local, so a multi-worker deployment would need database row locks. Email, OTP, handoff and consent are mocks.
 - Rules mode's extraction is keyword-based. Live (`llm`) mode handles paraphrase, typos and fragmented answers much better, but its NLU metrics need an API key to measure and vary between runs (reported as mean/min over k runs).
 - Name, email and phone are semi-public. Following the spec, any three factors verify. `REQUIRE_KNOWLEDGE_FACTOR` tightens this.
 - Guidance text is English-only (the fixtures only contain `en`).

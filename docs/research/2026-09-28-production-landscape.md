@@ -129,3 +129,25 @@ Open-source repos: https://github.com/daviddrysdale/python-phonenumbers · https
 - The Salesforce masking claim comes from a search snippet.
 - Some Rasa and Parlant details come from doc summaries rather than full-page reads.
 - Unverified: Prompt Guard latency on Groq, session handling in garak's REST generator, and whether promptfoo attack generation can run fully on Groq.
+
+## 7. Implementation status (2026-09-28)
+
+Every gap in §4 and every adoption in §5 was implemented. See `docs/superpowers/plans/2026-09-28-production-hardening-and-quality.md`:
+
+| Gap / adoption | Status |
+|---|---|
+| 1 Knowledge-only verification | ✅ OTP possession factor + policy tiers |
+| 2 Lockout durability | ✅ SQLite, 15-minute window, constant-time evaluation |
+| 3 User simulator + pass^k | ✅ `evals/simulator.py`, 8 personas, pass^k in scenarios and simulations |
+| 4 PII to the provider | ✅ Placeholder redaction + secure-entry turns |
+| 5 Ungrounded promises | ✅ Promise guard; optional HHEM eval score |
+| 6 Traces / end state | ✅ `expected_tool_trace`, `end_state` |
+| 7 Pre-authenticated channel | ✅ Signed channel assertions |
+| 8 Repair patterns | ✅ Repeat, start over, skip |
+| 9 Transcript → regression | ✅ `evals/export.py` |
+| 10 Durable state + warm handoff | ✅ SQLite + enriched handoff |
+| 11 Verification documentation | ✅ `verification_record` audit event |
+| OSS: Prompt Guard 2, gpt-oss-safeguard | ✅ Flag-only signals |
+| OSS: phonenumbers / email-validator / dateparser | ✅ |
+| OSS: Presidio | ✅ Validator second opinion |
+| OSS: promptfoo | ✅ Config + tooling session mode |
