@@ -1,0 +1,71 @@
+"""Tool implementations. Identity scope always comes from state, never from arguments."""
+from claims_agent.audit import mask
+from claims_agent.grounding.facts import Fact, claim_detail_facts, claim_option_facts
+from claims_agent.state import PII_FIELDS, ConversationState
+from claims_agent.tools.mocks import EmailSendError
+from claims_agent.tools.registry import (
+    ToolFailure,
+    ToolResult,
+    ToolSpec,
+    require_email_consent,
+    require_not_escalated,
+    require_selected_case,
+    require_verified,
+)
+
+
+def verify_identity(reg, state: ConversationState) -> ToolResult:
+    outcome = reg.verifier.evaluate(state)
+    return ToolResult(ok=outcome.status == "verified", data=outcome.model_dump())
+
+
+def search_claims(reg, state: ConversationState) -> ToolResult:
+    claims = reg.repo.claims_for(state.verification.party_id)
+    facts = tuple(f for c in claims for f in claim_option_facts(c))
+    return ToolResult(ok=True, facts=facts, data={"case_ids": [c.case_id for c in claims]})
+
+
+def get_claim_details(reg, state: ConversationState, case_id: str | None = None) -> ToolResult:
+    claim = reg.repo.claim(case_id or state.selected_case_id or "")
+    # Other parties' claims and non-existent claims are indistinguishable to the caller.
+    if claim is None or claim.party_id != state.verification.party_id:
+        return ToolResult(ok=False, error="not_on_account")
+    return ToolResult(ok=True, facts=claim_detail_facts(claim), data={"case_id": claim.case_id})
+
+
+def send_summary_email(reg, state: ConversationState, subject: str = "", body: str = "") -> ToolResult:
+    person = reg.repo.policyholder(state.verification.party_id)
+    try:
+        message_id = reg.email_sender.send(to=person.email, subject=subject, body=body)
+    except EmailSendError as exc:
+        raise ToolFailure("send_failed") from exc
+    masked = mask("email", person.email)
+    fact = Fact(fact_id="tool.send_summary_email.result", label="email_sent", value="sent",
+                display=f"summary emailed to {masked}")
+    return ToolResult(ok=True, facts=(fact,), data={"message_id": message_id, "masked_to": masked})
+
+
+def escalate_to_human(reg, state: ConversationState, reason: str = "unspecified") -> ToolResult:
+    verified = state.verification.verified
+    payload = {
+        "reason": reason,
+        "phase": state.phase.value,
+        "party_id": state.verification.party_id if verified else None,
+        "selected_case_id": state.selected_case_id if verified else None,
+        "captured_fields": {f: o.masked for f in PII_FIELDS if (o := state.current(f))},
+        "counters": state.counters.model_dump(),
+    }
+    ticket_id = reg.handoff.create(payload)
+    fact = Fact(fact_id="tool.escalate_to_human.ticket", label="ticket_id", value=ticket_id,
+                display=f"reference {ticket_id}")
+    return ToolResult(ok=True, facts=(fact,), data={"ticket_id": ticket_id, "reason": reason})
+
+
+def default_specs() -> list[ToolSpec]:
+    return [
+        ToolSpec("verify_identity", verify_identity),
+        ToolSpec("search_claims", search_claims, require_verified),
+        ToolSpec("get_claim_details", get_claim_details, require_selected_case),
+        ToolSpec("send_summary_email", send_summary_email, require_email_consent),
+        ToolSpec("escalate_to_human", escalate_to_human, require_not_escalated),
+    ]
