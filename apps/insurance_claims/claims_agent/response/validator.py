@@ -31,6 +31,19 @@ LIVE_DEADLINE_RE = re.compile(r"(still have \d+|\d+ (?:more )?days? (?:left|rema
                               r"deadline is (?:next|in \d|tomorrow|this|coming)|\buntil " + MONTH_ALT + r")", re.I)
 
 
+# Outcome promises / speculation: never grounded (no fact can assert a future decision).
+PROMISSORY_RE = re.compile(
+    r"\b(will (?:definitely |certainly |surely )?be (?:approved|paid|overturned|covered|accepted|reimbursed)|"
+    r"guarantee[ds]?\b|i promise|should (?:definitely |certainly )?be (?:approved|paid|overturned|accepted|covered)|"
+    r"(?:probably|likely|almost certainly|definitely) (?:be )?(?:approved|paid|overturned|accepted|covered)|"
+    r"(?:will|is going to) go through|you'?ll (?:definitely |certainly )?(?:be reimbursed|get paid|get your money))", re.I)
+NEGATION_RE = re.compile(r"(can'?t|cannot|can not|won'?t|not able to|unable to) (?:promise|guarantee)|"
+                         r"\bno guarantee|isn'?t guaranteed|not guaranteed|\bnot (?:be )?(?:approved|paid)|"
+                         r"nothing (?:will be|has been|was) paid|\bnot\b[^.]{0,20}\bwill be\b|"
+                         r"\bif\b[^.]{0,60}\b(?:will|should) be", re.I)
+PAID_NEGATION_RE = re.compile(r"(nothing|not|n'?t|never|no (?:money|payment)) (?:\w+ ){0,2}paid", re.I)
+
+
 class ValidationResult(FrozenModel):
     ok: bool
     violations: tuple[str, ...] = ()
@@ -79,6 +92,9 @@ class ResponseValidator:
         self._documents = sorted({d.lower() for c in repo.claims for d in c.documents_needed}
                                  | {k.lower() for k in DOC_ALIASES} | {k.lower() for k in repo.guideline.document_guidance},
                                  key=len, reverse=True)
+        # guideline wording ("original pathology report") and claim wording ("pathology report") are one document
+        self._canonical_doc = {target.lower(): source.lower() for source, target in DOC_ALIASES.items()
+                               if target and source != target}
         self._phrases = {c.case_id: [p for p in (c.denial_reason, c.summary) if p] for c in repo.claims}
         self._owner = {c.case_id: c.party_id for c in repo.claims}
         self._names = {p.party_id: [n.lower() for n in (p.name, *p.name_aliases)] for p in repo.policyholders}
@@ -97,11 +113,12 @@ class ResponseValidator:
         atoms |= {f"code:{c}" for c in re.findall(r"(?<![\d-])\d{6}(?![\d-])", text)}
         for sentence in re.split(r"[.!?\n]", low):
             words = STATUS_WORDS if CLAIM_REF.search(sentence) else (STRONG_STATUS if strict else ())
+            words = tuple(w for w in words if not (w == "paid" and PAID_NEGATION_RE.search(sentence)))
             atoms |= {f"status:{w}" for w in words if re.search(rf"\b{w}\b", sentence)}
         remaining = low
         for doc in self._documents:
             if doc in remaining:
-                atoms.add(f"document:{doc}")
+                atoms.add(f"document:{self._canonical_doc.get(doc, doc)}")
                 remaining = remaining.replace(doc, " ")
         for party, names in self._names.items():
             if any(re.search(rf"\b{re.escape(n)}\b", low) for n in names):
@@ -130,6 +147,15 @@ class ResponseValidator:
             return any(value in vals for pid, vals in self._pii.items() if pid != party)
         return False
 
+    @staticmethod
+    def _promissory(reply: str) -> list[str]:
+        found = []
+        for sentence in re.split(r"(?<=[.!?])\s+", reply):
+            m = PROMISSORY_RE.search(sentence)
+            if m and not NEGATION_RE.search(sentence):
+                found.append(f"promissory:{m.group(0).lower()}")
+        return found
+
     def _scanner_violations(self, reply: str, ctx: ResponseContext) -> list[str]:
         """Second opinion from Presidio: contact details / SSNs never appear unless they are allowlisted facts."""
         if self._scanner is None:
@@ -155,6 +181,7 @@ class ResponseValidator:
             for atom in sorted(atoms - allowed):
                 violations.append(("other_party:" if self._other_party(atom, party) else "ungrounded:") + atom)
         violations += self._scanner_violations(reply, ctx)
+        violations += self._promissory(reply)
         if any(f.label == "appeal_deadline_status" and f.value == "passed" for f in ctx.facts) \
                 and LIVE_DEADLINE_RE.search(reply):
             violations.append("deadline_presented_as_live")
