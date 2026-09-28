@@ -42,6 +42,26 @@ def _guidance(ctx: StepContext, state: ConversationState, claim_facts, deadline:
     return list(result.facts) if result.ok else []
 
 
+def _multi(ctx: StepContext, state: ConversationState, claim_facts, claim, deadline) -> Decision | None:
+    """Several questions in one turn: answer each part from its grounded facts, in a stable order."""
+    attrs = [a for a in ("denial_reason", "status", "amounts", "deadline", "documents")
+             if a in ctx.analysis.intent.asked_attributes]
+    if len(attrs) < 2:
+        return None
+    chosen: list[Fact] = []
+    parts = {"denial_reason": lambda: _by_label(claim_facts, "denial_reason", "document_needed"),
+             "status": lambda: _by_label(claim_facts, "status"),
+             "amounts": lambda: list(payout_facts(claim, ctx.ctl.repo.claim_schema)),
+             "deadline": lambda: deadline, "documents": lambda: _by_label(claim_facts, "document_needed")}
+    for attr in attrs:
+        chosen += [f for f in parts[attr]() if f not in chosen]
+    extra = tuple(f for f in chosen if f not in claim_facts)
+    details = {"answer_ids": [f.fact_id for f in chosen], "offer_human": False}
+    if deadline and deadline[0].value == "passed" and "deadline" in attrs:
+        details.update(implicit_offer="deadline_review", offer_is_answer=True)
+    return ctx.decide(state, A.ANSWER, facts=claim_facts + extra, details=details)
+
+
 def answer(ctx: StepContext, state: ConversationState, claim_facts: tuple[Fact, ...]) -> Decision:
     intent = ctx.analysis.intent
     claim = ctx.ctl.repo.claim(state.selected_case_id)
@@ -52,6 +72,9 @@ def answer(ctx: StepContext, state: ConversationState, claim_facts: tuple[Fact, 
                           details={"answer_ids": [fact.fact_id], "offer_human": False})
     if intent.document_unavailable and intent.documents_mentioned:
         return _doc_unavailable(ctx, state, claim_facts)
+    multi = _multi(ctx, state, claim_facts, claim, deadline)
+    if multi is not None:
+        return multi
     chosen: list[Fact]
     if intent.asked_attribute == "denial_reason" or intent.topic == "denial_question":
         chosen = _by_label(claim_facts, "denial_reason", "document_needed") or _by_label(claim_facts, "status")

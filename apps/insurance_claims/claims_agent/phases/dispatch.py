@@ -4,7 +4,11 @@ from claims_agent.controller import ControllerAction as A
 from claims_agent.controller import Decision, StepContext
 from claims_agent.grounding.facts import Fact
 from claims_agent.phases import post, process, resolve, verify
-from claims_agent.policy.emotion import HEATED, strategy_for
+from claims_agent.policy.emotion import HEATED, EmotionStrategy, strategy_for
+
+MANIPULATION = EmotionStrategy(label="manipulation", steps=("explain_requirement", "return_to_action"))
+THREAT = EmotionStrategy(label="threat", intensity="high", steps=("set_boundary", "explain_requirement",
+                                                                   "return_to_action"), offer_human=True)
 from claims_agent.policy.scope import decide_scope
 from claims_agent.state import ConsentState, ConversationState, IntentHints, Phase
 
@@ -50,7 +54,13 @@ def run(ctx: StepContext, state: ConversationState) -> Decision:
     ctx.emotion = strategy_for(analysis.emotion.label, analysis.emotion.intensity, heated,
                                already_acknowledged=previous_emotion == analysis.emotion.label)
     if analysis.social_engineering and not state.verification.verified:
-        ctx.emotion = strategy_for("distrust", "medium", 0)  # explain why the protection exists
+        ctx.emotion = MANIPULATION  # neutral: restate the requirement, no "fair question" pleasantries
+    if analysis.threat:
+        ctx.emotion = THREAT
+    if analysis.wellbeing_risk:  # people before process: care + crisis resources + a human, in any phase
+        if state.escalation.active:
+            return ctx.decide(state, A.CRISIS_SUPPORT)
+        return ctx.escalate(state, "wellbeing_concern")
     if state.phase == Phase.ESCALATED:
         return ctx.decide(state, A.ESCALATED_HOLD)
     if state.phase == Phase.COMPLETE:
@@ -63,6 +73,8 @@ def run(ctx: StepContext, state: ConversationState) -> Decision:
         return ctx.escalate(state, "caller_request")
     if offer and analysis.consent_signal == "YES" and analysis.requested_action != "ask_question":
         return ctx.escalate(state, offer)
+    if analysis.requested_action == "readback":
+        return ctx.decide(state, A.REFUSE_READBACK, details={"resume_field": state.expected_field})
     if analysis.requested_action == "start_over":
         return _start_over(ctx, state)
     scoped = _scope(ctx, state)

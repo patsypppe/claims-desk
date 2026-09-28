@@ -30,6 +30,10 @@ ESCALATION_LEADS = {
                   "colleague.",
     "document_alternatives_exhausted": "Since the usual alternatives aren't available, a claims representative "
                                        "should review the file with you. I'm connecting you now.",
+    "wellbeing_concern": ("I'm really sorry you're feeling this way, and I'm glad you told me. You don't have to go "
+                          "through this alone: in the U.S. you can call or text 988 to reach the Suicide & Crisis "
+                          "Lifeline at any time, and if you're in immediate danger please call 911. I'm also "
+                          "connecting you with a member of our team right now so a person can help with your claim."),
     "otp_unavailable": "No problem. Since the code isn't reachable, I'm connecting you with a colleague who can "
                        "verify you another way.",
     "deadline_review": "Of course. Since the appeal deadline has passed, I'm connecting you with a claims "
@@ -191,6 +195,11 @@ RENDERERS = {
     A.ASK_FIELDS: _ask_fields,
     A.OFFER_ALT_FIELD: _offer_alt,
     A.VERIFY_FAILED: lambda ctx: GENERIC_FAILURE,
+    A.CRISIS_SUPPORT: lambda ctx: ("I'm really sorry you're going through this. Please reach out now: in the U.S. "
+                                   "call or text 988 (Suicide & Crisis Lifeline), or call 911 if you're in immediate "
+                                   "danger. A member of our team will be with you shortly."),
+    A.REFUSE_READBACK: lambda ctx: ("For your security, I never read back identifiers like your SSN, date of birth or "
+                                    "full phone number." + _resume(ctx)),
     A.OTP_SENT: lambda ctx: (("I've sent a new code. " if ctx.details.get("resent") else
                               "That's okay, we can confirm it's you another way. ")
                              + "If the details you've shared match our records, a 6-digit code is on its way to the "
@@ -204,8 +213,10 @@ RENDERERS = {
                                        "I'm happy to help, or I can connect you with a member of our team."),
     A.ASK_INTENT: lambda ctx: f"{_verified_prefix(ctx)}What can I help you with today? I see these claims on your "
                               f"account: {_options(ctx)}.",
-    A.DISAMBIGUATE_CASE: lambda ctx: f"{_verified_prefix(ctx)}I found more than one claim that could match: "
-                                     f"{_options(ctx)}. Which one would you like to discuss?",
+    A.DISAMBIGUATE_CASE: lambda ctx: (f"{_verified_prefix(ctx)}The only claim I see on your account is the "
+                                      f"{ctx.options[0]}. Would you like to discuss it?" if len(ctx.options) == 1 else
+                                      f"{_verified_prefix(ctx)}I found more than one claim that could match: "
+                                      f"{_options(ctx)}. Which one would you like to discuss?"),
     A.NO_MATCHING_CASE: lambda ctx: f"{_verified_prefix(ctx)}I don't see that claim on your account. Here's what I "
                                     f"do see: {_options(ctx)}. Which one would you like to discuss?",
     A.NO_CLAIMS: lambda ctx: f"{_verified_prefix(ctx)}I don't see any claims on your account right now. Is there "
@@ -245,6 +256,7 @@ RENDERERS = {
 PROTECTION = ("We only ask for these details so that nobody else can access your claim information. We never "
               "need your full SSN, just the last four digits, and you can use your phone number or email instead.")
 REASSURE = "You're in the right place."
+BOUNDARY = "I want to get this sorted for you, and I need us to keep this conversation respectful."
 ONE_STEP = "Let's take it one step at a time."
 VERIFY_ACTIONS = (A.ASK_FIELDS, A.OFFER_ALT_FIELD, A.VERIFY_FAILED, A.OTP_SENT)
 
@@ -259,6 +271,8 @@ def emotion_parts(ctx: ResponseContext, body: str) -> list[str]:
         parts.append(REASSURE)
     if "one_step" in steps:
         parts.append(ONE_STEP)
+    if "set_boundary" in steps:
+        parts.append(BOUNDARY)
     if not ctx.verified and ctx.action in VERIFY_ACTIONS:
         if "explain_protection" in steps:
             parts.append(PROTECTION)

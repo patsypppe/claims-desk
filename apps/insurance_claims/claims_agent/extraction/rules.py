@@ -34,6 +34,8 @@ class RuleExtractor:
             requested_action=self._action(text, has_data=bool(pii) or bool(re.search(r"\d{4}", text))),
             tool_requests=[ToolRequest(name="search_claims")] if lx.TOOL_REQUEST_RE.search(text) else [],
             injection_suspected=bool(lx.INJECTION_RE.search(text)),
+            wellbeing_risk=bool(lx.CRISIS_RE.search(text)),
+            threat=bool(lx.THREAT_RE.search(text)),
         )
 
     # ---- PII -------------------------------------------------------------------------------------
@@ -59,7 +61,7 @@ class RuleExtractor:
         found += [("id_last4", v) for v in self._id_values(text, expected, dob_spans, phones)]
         found += [("name", n) for n in self._names(text, expected)]
         candidates = [PiiCandidate(field=f, raw_value=v.strip(), is_correction=correction) for f, v in found]
-        return candidates + self._refusals(text, expected)
+        return candidates + self._refusals(text, expected, {f for f, _ in found})
 
     def _id_values(self, text: str, expected: str | None, dob_spans: list[str], phones: list[str]) -> list[str]:
         values = []
@@ -75,10 +77,19 @@ class RuleExtractor:
 
     def _names(self, text: str, expected: str | None) -> list[str]:
         names = []
+        for m in lx.SPELLED_RE.finditer(text):  # "M-A-R-G-A-R-E-T" spelled out letter by letter
+            word = re.sub(r"[-\s]", "", m.group(1))
+            if len(word) >= 3:
+                names.append(word.capitalize())
+                break
         for m in lx.NAME_CUE_RE.finditer(text):
             words = [w for w in m.group(1).split() if w not in lx.NAME_STOPWORDS]
-            if len(words) >= 2 and all(w[0].isupper() for w in words):
-                names.append(" ".join(words))
+            spelled_or_correction = names or re.search(r"(sorry|that'?s|it'?s)", m.group(0), re.I)
+            if (len(words) >= 2 or (words and spelled_or_correction)) and all(w[0].isupper() for w in words):
+                names.insert(0, " ".join(words))
+        names = list(dict.fromkeys(names))
+        if len(names) > 1 and len({n.lower() for n in names}) == 1:
+            names = names[:1]
         if not names:
             for lead in lx.LEADING_NAME_RE.finditer(text):
                 if not any(w in lx.NAME_STOPWORDS for w in lead.group(1).split()):
@@ -90,16 +101,19 @@ class RuleExtractor:
             names.append(bare)
         return list(dict.fromkeys(names))
 
-    def _refusals(self, text: str, expected: str | None) -> list[PiiCandidate]:
+    def _refusals(self, text: str, expected: str | None, provided: set[str] | None = None) -> list[PiiCandidate]:
         if lx.SKIP_RE.search(text) and expected in PII_FIELDS:
             return [PiiCandidate(field=expected, raw_value="", caller_refused=True)]
-        if not lx.REFUSAL_RE.search(text):
+        clauses = [c for c in re.split(r"(?<=[.!?;])\s+|,\s*but\s+", text) if lx.REFUSAL_RE.search(c)]
+        if not clauses:
             return []
-        if lx.REFUSE_ALL_RE.search(text):
+        refusal_text = " ".join(clauses)  # only the clause that refuses, not the whole message
+        if lx.REFUSE_ALL_RE.search(refusal_text):
             fields = list(PII_FIELDS)
         else:
-            fields = [f for f, pattern in lx.FIELD_WORDS.items() if pattern.search(text)]
+            fields = [f for f, pattern in lx.FIELD_WORDS.items() if pattern.search(refusal_text)]
             fields = fields or ([expected] if expected else [])
+        fields = [f for f in fields if f not in (provided or set())]  # a value given in this message isn't refused
         return [PiiCandidate(field=f, raw_value="", caller_refused=True) for f in fields]
 
     def _split_third_party(self, text: str, pii: list[PiiCandidate]):
@@ -136,6 +150,8 @@ class RuleExtractor:
             topic=_first(lx.TOPIC_RULES, low, "none"),
             asked_attribute=_first(lx.ATTRIBUTE_RULES, low, "none") if "?" in text or low.startswith(
                 ("what", "why", "when", "which", "how", "who")) else "none",
+            asked_attributes=[a for a, pat in lx.ATTRIBUTE_RULES if re.search(pat, low)]
+            if "?" in text else [],
             documents_mentioned=docs, document_unavailable=unavailable,
         )
 
@@ -150,7 +166,7 @@ class RuleExtractor:
     @staticmethod
     def _relationship(text: str) -> str | None:
         m = lx.SELF_RELATION_RE.search(text)
-        return m.group(1).lower() if m else None
+        return (m.group(1) or m.group(2)).lower() if m else None
 
     @staticmethod
     def _subject_relation(text: str) -> str | None:
@@ -184,6 +200,8 @@ class RuleExtractor:
 
     @staticmethod
     def _action(text: str, has_data: bool = False) -> str:
+        if lx.READBACK_RE.search(text):
+            return "readback"
         if not has_data and len(text.split()) <= 10:  # repairs are short, standalone utterances
             for action, pattern in (("repeat", lx.REPEAT_RE), ("start_over", lx.START_OVER_RE), ("skip", lx.SKIP_RE)):
                 if pattern.search(text):

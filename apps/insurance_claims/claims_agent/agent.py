@@ -1,6 +1,7 @@
 """Turn pipeline: extract -> remember -> control -> tools -> context -> respond -> validate."""
 import os
 import threading
+import unicodedata
 import weakref
 from datetime import date
 
@@ -15,6 +16,7 @@ from claims_agent.extraction.merge import apply_analysis, merge
 from claims_agent.extraction.rules import RuleExtractor
 from claims_agent.extraction.schema import TurnAnalysis
 from claims_agent.llm.client import FakeLLM, LLMClient, NullLLM
+from claims_agent.normalize import unify_dashes
 from claims_agent.privacy.redact import redact, restore_analysis
 from claims_agent.response.context import authorized_values, build_context
 from claims_agent.response.llm_responder import LLMResponder
@@ -140,7 +142,7 @@ class Agent:
 
     def _handle(self, session_id: str, text: str, sensitive: bool) -> TurnResult:
         state = self.sessions.get(session_id)
-        text = (text or "")[:MAX_INPUT_CHARS]
+        text = unify_dashes(unicodedata.normalize("NFKC", text or ""))[:MAX_INPUT_CHARS]  # fullwidth/hyphen variants
         state = state.model_copy(update={"turn": state.turn + 1})
         analysis, events, degraded = self._understand(state, text, sensitive)
         if analysis.requested_action == "repeat" and state.last_reply:

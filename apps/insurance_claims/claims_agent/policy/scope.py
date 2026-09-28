@@ -11,7 +11,9 @@ UNSAFE_RE = re.compile(r"(system prompt|developer mode|dev mode|jailbreak|your i
                        r"list all (claims|customers|policies))", re.I)
 
 
-OTHER_PERSON_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+'s\s+(?i:claims?|account|policy|information|details)")
+OTHER_PERSON_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+'s\s+(?i:claims?|account|policy|information|details|"
+                             r"email(?: address)?|phone(?: number)?|address|date of birth|dob|ssn|social|number|info|"
+                             r"data|birthday)")
 
 
 class ScopeDecision(FrozenModel):

@@ -42,6 +42,7 @@ class IntentHintsIn(_Strict):
     asked_attribute: AskedAttribute = "none"
     documents_mentioned: list[str] = Field(default_factory=list)
     document_unavailable: bool = False
+    asked_attributes: list[AskedAttribute] = Field(default_factory=list)
 
 
 class Emotion(_Strict):
@@ -62,7 +63,9 @@ class TurnAnalysis(_Strict):
     emotion: Emotion = Field(default_factory=Emotion)
     consent_signal: Literal["YES", "NO", "AMBIGUOUS", "NONE"] = "NONE"
     requested_action: Literal["provide_info", "ask_question", "done", "request_human", "request_other_email",
-                              "repeat", "start_over", "skip", "other"] = "provide_info"
+                              "repeat", "start_over", "skip", "readback", "other"] = "provide_info"
     tool_requests: list[ToolRequest] = Field(default_factory=list)
     injection_suspected: bool = False
     social_engineering: bool = False
+    wellbeing_risk: bool = False
+    threat: bool = False

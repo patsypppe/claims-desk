@@ -66,14 +66,18 @@ def _merge_intent(rules: IntentHintsIn, llm: IntentHintsIn, text: str, turn: int
             events.append(_rejected("claim_id", turn))
     month_word = bool(re.search(MONTH_ALT, text, re.I))
     pick = lambda r, l, default=None: l if l not in (None, "none", default) else r  # noqa: E731
+    from claims_agent.extraction.lexicon import TYPE_SUPPORT
+
+    llm_type = llm.case_type if llm.case_type and TYPE_SUPPORT[llm.case_type].search(text) else None
     return IntentHintsIn(
-        case_type=pick(rules.case_type, llm.case_type), status=pick(rules.status, llm.status),
+        case_type=rules.case_type or llm_type, status=pick(rules.status, llm.status),
         month=rules.month or (llm.month if month_word else None),
         year=rules.year or (llm.year if llm.year and str(llm.year) in text else None),
         claim_id=claim_id, topic=pick(rules.topic, llm.topic), followup_topic=pick(rules.followup_topic, llm.followup_topic),
         asked_attribute=pick(rules.asked_attribute, llm.asked_attribute),
         documents_mentioned=sorted({d for d in rules.documents_mentioned + llm.documents_mentioned if _in_text(d, text)}),
         document_unavailable=rules.document_unavailable or llm.document_unavailable,
+        asked_attributes=list(dict.fromkeys(rules.asked_attributes + llm.asked_attributes)),
     )
 
 
@@ -155,6 +159,8 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
         tool_requests=rules.tool_requests + [t for t in llm.tool_requests
                                              if t.name not in {r.name for r in rules.tool_requests}],
         injection_suspected=rules.injection_suspected or llm.injection_suspected,
+        wellbeing_risk=rules.wellbeing_risk or llm.wellbeing_risk,
+        threat=rules.threat or llm.threat,
     )
     return merged, events
 
@@ -200,7 +206,11 @@ def _apply_pii(state: ConversationState, analysis: TurnAnalysis, turn: int, toda
             conflicts.append(field)
             continue
         if values:
-            observed = _store_field(observed, field, values[-1], turn, "rules")
+            value = values[-1]
+            current = state.current(field)
+            if field == "name" and current and len(value.split()) == 1 and len(current.normalized.split()) >= 2:
+                value = " ".join([value] + current.normalized.split()[1:])  # "that's Margaret" fixes the first name
+            observed = _store_field(observed, field, value, turn, "rules")
             refused.discard(field)
     return observed, frozenset(refused), conflicts
 

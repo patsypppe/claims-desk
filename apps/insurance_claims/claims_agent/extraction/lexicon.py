@@ -18,8 +18,8 @@ ENDS_RE = re.compile(r"ends?\s+(?:in|with)", re.I)
 PHONE_WORD_RE = re.compile(r"(phone|number|cell|mobile)", re.I)
 DOB_CUE_RE = re.compile(r"(dob|date of birth|birth\s*day|birthdate|born)", re.I)
 NAME_CUE_RE = re.compile(
-    r"\b(?i:my name is|my name's|name is|i am|i'm|this is|it's)\s+((?:[A-Z][a-zA-Z'-]+)(?:\s+[A-Z][a-zA-Z'-]+){0,3})")
-LEADING_NAME_RE = re.compile(r"(?:^|[.!?]\s+)([A-Z][a-z'-]+(?:\s+[A-Z][a-z'-]+){1,3})\s*[,.;]")
+    r"\b(?i:my name is|my name's|name is|i am|i'm|this is|it's|that's|thats)\s+((?:[A-Z][a-zA-Z'-]+)(?:\s+[A-Z][a-zA-Z'-]+){0,3})")
+LEADING_NAME_RE = re.compile(r"(?:^|[.!?:]\s+)([A-Z][a-z'-]+(?:\s+[A-Z][a-z'-]+){1,3})(?:\s*[,.;]|\s+(?=[^\w\s]))")
 FILLER_WORDS = frozenset({"hold", "on", "one", "sec", "second", "moment", "minute", "hi", "hello", "hey", "there",
                           "wait", "a", "ok", "okay", "yes", "no", "sure", "thanks", "thank", "you", "um", "uh", "hmm",
                           "please", "just", "what", "why", "sorry", "fine", "good", "morning", "afternoon", "idk"})
@@ -76,7 +76,8 @@ EMOTION_RES = (
     ("anxiety", re.compile(r"(worried|anxious|scared|stress|panic|can'?t afford|afraid|nervous)", re.I)),
     ("confusion", re.compile(r"(confus|don'?t understand|what do you mean|not sure what|lost me)", re.I)),
 )
-THIRD_PARTY_RE = re.compile(r"(on behalf of|(?:calling (?:for|about)|for) my (?:mother|mom|father|dad|wife|husband|"
+THIRD_PARTY_RE = re.compile(r"(\bi'?m\s+(?:\w+\s+){1,3}?\w+'s\s+(?:husband|wife|son|daughter|mother|father|partner|"
+                            r"brother|sister|friend|caregiver|spouse)\b|on behalf of|(?:calling (?:for|about)|for) my (?:mother|mom|father|dad|wife|husband|"
                             r"son|daughter|parent|spouse)|i'?m (?:her|his) (\w+))", re.I)
 RELATIONSHIP_RE = re.compile(r"\b(son|daughter|husband|wife|mother|father|mom|dad|brother|sister|spouse|partner|"
                              r"friend|caregiver)\b", re.I)
@@ -99,7 +100,7 @@ ATTRIBUTE_RULES = (
 )
 SUBJECT_RE = re.compile(r"(?i:on behalf of|calling for|calling about|for)\s+(?i:my\s+\w+[,]?\s+)?"
                         r"([A-Z][a-zA-Z'-]+\s+[A-Z][a-zA-Z'-]+)")
-SELF_RELATION_RE = re.compile(r"\bi'?m (?:her|his|their) (\w+)", re.I)
+SELF_RELATION_RE = re.compile(r"\bi'?m (?:her|his|their) (\w+)|\bi'?m\s+(?:\w+\s+){1,3}?\w+'s\s+(\w+)", re.I)
 SUBJECT_RELATION_RE = re.compile(r"\bmy (mother|mom|mum|father|dad|parent|wife|husband|spouse|son|daughter)\b", re.I)
 SUBJECT_NAME_RE = re.compile(r"\b(?i:her|his|their) name is ([A-Z][a-zA-Z'-]+\s+[A-Z][a-zA-Z'-]+)")
 REPEAT_RE = re.compile(r"^\W*(?:sorry[,.]?\s*|um+[,.]?\s*)?(?:(?:can|could) you |please )?(?:repeat that|say that "
@@ -110,3 +111,21 @@ START_OVER_RE = re.compile(r"^\W*(?:actually[,.]?\s*|ok(?:ay)?[,.]?\s*|so[,.]?\s
                            re.I)
 SKIP_RE = re.compile(r"^\W*(?:(?:can|could) we |let'?s |please |i'?d like to )?(?:skip (?:this|that|it)(?: one| "
                      r"question)?|next question|pass on (?:this|that))\b", re.I)
+CRISIS_RE = re.compile(r"(kill(?:ing)? myself|end it all|end my life|suicid|(?:don'?t|no) see (?:the|any) point in "
+                       r"living|no point (?:in )?living|want to die|take my (?:own )?life|hurt(?:ing)? myself|"
+                       r"can'?t go on|better off dead)", re.I)
+THREAT_RE = re.compile(r"(make you (?:all )?pay|come (?:down )?to your office|i'?ll (?:hurt|find|get) you|you'?ll regret|"
+                       r"i know where you|watch your back|burn (?:it|the place) down)", re.I)
+READBACK_RE = re.compile(r"(read (?:me )?back|what(?:'?s| is) my (?:full )?(?:ssn|social|phone(?: number)?|email|date of "
+                         r"birth|dob|address)|what (?:date of birth|dob|phone(?: number)?|email(?: address)?|ssn|social) "
+                         r"do you have|full (?:ssn|social|phone number)|tell me my (?:ssn|social|dob|date of birth|phone))",
+                         re.I)
+POSSESSIVE_REL_RE = re.compile(r"\bi'?m\s+(?:[A-Z][a-zA-Z'-]+\s+){1,3}?[A-Z][a-zA-Z-]*'s\s+(husband|wife|son|daughter|mother|"
+                               r"father|partner|brother|sister|friend|caregiver|spouse)\b")
+SPELLED_RE = re.compile(r"\b([A-Za-z](?:[-\s][A-Za-z]){2,})\b")
+TYPE_SUPPORT = {
+    "auto": re.compile(r"\b(auto|car|vehicle|truck|accident|crash|collision|repair|bumper|windshield|motor)", re.I),
+    "healthcare": re.compile(r"\b(health|medical|doctor|hospital|clinic|surg|mri|scan|x-?ray|lab|patholog|prescri|"
+                             r"therap|er\b|emergency room|physician|treatment)", re.I),
+    "dental": re.compile(r"\b(dental|dentist|tooth|teeth|orthodont|cavity|root canal|crown|filling)", re.I),
+}

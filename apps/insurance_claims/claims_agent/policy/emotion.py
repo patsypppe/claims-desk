@@ -8,7 +8,7 @@ from typing import Literal
 from claims_agent.domain.models import FrozenModel
 
 Step = Literal["acknowledge", "empathize", "explain_requirement", "alternatives", "return_to_action",
-               "reassure", "one_step", "explain_protection"]
+               "reassure", "one_step", "explain_protection", "set_boundary"]
 HEATED = frozenset({"frustration", "anger", "distrust"})
 
 
