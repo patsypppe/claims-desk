@@ -1,0 +1,11 @@
+# Independent oracle for phase-scoped tool permissions, written from the spec (§15),
+# NOT generated from claims_agent.tools.registry. Tests compare the two.
+verify_identity: [VERIFY_ID]
+request_representative_consent: [VERIFY_ID]
+search_claims: [RESOLVE_INTENT, PROCESS_CASE]
+get_claim_details: [PROCESS_CASE]
+get_followup_guidance: [PROCESS_CASE]
+get_document_guidance: [PROCESS_CASE]
+build_summary: [POST_PROCESS]
+send_summary_email: [POST_PROCESS]
+escalate_to_human: [VERIFY_ID, RESOLVE_INTENT, PROCESS_CASE, POST_PROCESS]

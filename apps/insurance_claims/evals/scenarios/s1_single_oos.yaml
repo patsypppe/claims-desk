@@ -1,0 +1,12 @@
+id: s1_single_oos
+category: scope
+description: A single irrelevant question is redirected; captured data is kept.
+oracle_factors: {name: Margaret Chen}
+expected_outcome: {escalated: false}
+turns:
+  - user: "Hi, I'm Margaret Chen."
+    expect: {state: {phase: VERIFY_ID}}
+  - user: "Can you give me a pasta recipe?"
+    expect:
+      state: {phase: VERIFY_ID, captured_count: 1, counters: {out_of_scope: 1}, escalated: false}
+      metric: [scope]

@@ -1,0 +1,10 @@
+id: x1_human_request
+category: escalation
+description: Explicit request for a representative escalates in any phase.
+oracle_factors: {}
+expected_outcome: {escalated: true, escalation_reason: caller_request, terminal: ESCALATED}
+turns:
+  - user: "I want to talk to a real person, please."
+    expect: {state: {escalated: true, phase: ESCALATED}, tools_called: [escalate_to_human]}
+  - user: "Actually, never mind, verify me: Margaret Chen, 1985-03-15, 4472."
+    expect: {state: {escalated: true, phase: ESCALATED, verified: false}}

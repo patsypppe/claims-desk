@@ -1,0 +1,31 @@
+id: m1_margaret_sample
+category: memory
+tags: [happy_path, sample]
+description: Spec §18 sample — everything in one utterance; intent survives verification.
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", id_last4: "4472", policy_number: POL-9921}
+expected_outcome: {terminal: COMPLETE, case_id: CL-2048, escalated: false, optimal_turns: 5}
+turns:
+  - user: "I'm the policyholder. My name is Margaret Chen, policy POL-9921. I'm calling about my denied healthcare claim from January. DOB is 1985-03-15, SSN last four is 4472."
+    expect:
+      state: {verified: true, verified_party_id: P9, phase: PROCESS_CASE, selected_case_id: CL-2048,
+              intent_hints: {case_type: healthcare, status: denied, month: 1}}
+      tools_called: [verify_identity, search_claims, get_claim_details]
+      no_redundant_ask: [intent, name, dob, id_last4]
+      metric: [memory, intent]
+      text: {must_reference: [CL-2048, pathology report, office note]}
+  - user: "What do I need to send and how soon?"
+    expect:
+      state: {phase: PROCESS_CASE}
+      tools_called: [get_followup_guidance]
+      text:
+        must_reference: ["within a week"]
+        must_not_match: ['(until|by|before)\s+(march 18|2026-03-18)']
+        no_ungrounded_atoms: true
+  - user: "Which hospital submitted it?"
+    expect: {state: {phase: PROCESS_CASE}, text: {no_ungrounded_atoms: true, must_reference: [{any: ["don't have", "do not have", "not include", "doesn't include", "not in"]}]}}
+  - user: "No, that's everything."
+    expect: {state: {phase: POST_PROCESS, consent: OFFERED}, tools_not_called: [send_summary_email]}
+  - user: "Yes, please email me the summary."
+    expect:
+      state: {phase: COMPLETE, consent: SENT}
+      tools_called: [{name: send_summary_email, times: 1}]

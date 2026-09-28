@@ -1,0 +1,15 @@
+id: v9_refuse_ssn_alternative
+category: verification
+tags: [recovery]
+description: Caller refuses SSN; agent offers another approved field and verifies by email.
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", email: margaret@email.com}
+expected_outcome: {escalated: false}
+turns:
+  - user: "Margaret Chen, date of birth March 15, 1985."
+    expect: {state: {verified: false}}
+  - user: "I'm not giving you my SSN."
+    expect:
+      state: {verified: false, phase: VERIFY_ID}
+      text: {asks_for_any: [phone, email]}
+  - user: "Fine, my email is margaret@email.com"
+    expect: {state: {verified: true}}

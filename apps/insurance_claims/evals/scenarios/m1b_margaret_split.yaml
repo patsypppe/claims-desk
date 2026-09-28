@@ -1,0 +1,21 @@
+id: m1b_margaret_split
+category: memory
+tags: [happy_path]
+description: Intent given before verification across several turns is used after verification without re-asking.
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", id_last4: "4472"}
+expected_outcome: {case_id: CL-2048, escalated: false}
+turns:
+  - user: "Hi, I'm Margaret Chen. My healthcare claim from January got denied and I want to know why."
+    expect:
+      state: {phase: VERIFY_ID, verified: false, intent_hints: {case_type: healthcare, status: denied, month: 1}}
+      tools_not_called: [search_claims, get_claim_details]
+      text: {asks_for_any: [dob, id_last4, phone, email]}
+  - user: "My date of birth is 3/15/1985."
+    expect: {state: {verified: false, phase: VERIFY_ID}, text: {asks_for_any: [id_last4, phone, email]}}
+  - user: "Last four of my social is 4472."
+    expect:
+      state: {verified: true, phase: PROCESS_CASE, selected_case_id: CL-2048}
+      tools_called: [verify_identity, search_claims]
+      no_redundant_ask: [intent, name, dob]
+      metric: [memory]
+      text: {must_reference: [CL-2048]}

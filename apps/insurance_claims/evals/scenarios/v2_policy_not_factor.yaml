@@ -1,0 +1,11 @@
+id: v2_policy_not_a_factor
+category: verification
+description: Policy number + 2 PII is insufficient.
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", policy_number: POL-9921}
+expected_outcome: {escalated: false}
+turns:
+  - user: "My name is Margaret Chen, policy POL-9921, date of birth 1985-03-15. What's my claim status?"
+    expect:
+      state: {verified: false, phase: VERIFY_ID}
+      tools_not_called: [verify_identity, search_claims]
+      text: {asks_for_any: [id_last4, phone, email]}
