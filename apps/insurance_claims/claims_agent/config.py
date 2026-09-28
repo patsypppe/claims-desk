@@ -105,6 +105,7 @@ class Settings:
     verify_min_ms: int = 0
     cookie_secure: bool = False
     session_create_limit: int = 20
+    allow_header_sessions: bool = False
     mock_otp_reveal: bool = False
     prompt_guard_model: str = "meta-llama/llama-prompt-guard-2-86m"
     safeguard_model: str = "openai/gpt-oss-safeguard-20b"
@@ -157,6 +158,7 @@ class Settings:
             verify_min_ms=_int_env("VERIFY_FAILURE_MIN_MS", 400),
             cookie_secure=_bool_env("COOKIE_SECURE", False),
             session_create_limit=_int_env("SESSION_CREATE_LIMIT", 20),
+            allow_header_sessions=_bool_env("ALLOW_HEADER_SESSIONS", False),
             channel_signing_key=SecretStr(os.environ["CHANNEL_SIGNING_KEY"])
             if os.environ.get("CHANNEL_SIGNING_KEY") else None,
             prompt_guard_model=os.environ.get("PROMPT_GUARD_MODEL") or "meta-llama/llama-prompt-guard-2-86m",

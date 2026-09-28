@@ -81,3 +81,20 @@ def test_sensitive_flag_accepted(client):
 
 def test_ui_has_secure_entry_toggle(client):
     assert 'id="secure-toggle"' in client.get("/").text
+
+
+def test_header_sessions_disabled_by_default(client):
+    sid = client.post("/api/session").json().get("session_id")
+    assert sid is None
+    client.cookies.clear()
+    assert client.post("/api/chat", json={"text": "hi"}, headers={"X-Session-Id": "anything"}).status_code == 401
+
+
+def test_header_sessions_when_enabled_still_require_server_issued_ids():
+    from claims_agent.api import create_app
+    c = TestClient(create_app(Settings(agent_mode="rules", app_today=TODAY, fixtures_dir=FIXTURES_DIR,
+                                       allow_header_sessions=True)))
+    sid = c.post("/api/session").json()["session_id"]
+    c.cookies.clear()
+    assert c.post("/api/chat", json={"text": "hi"}, headers={"X-Session-Id": sid}).status_code == 200
+    assert c.post("/api/chat", json={"text": "hi"}, headers={"X-Session-Id": "forged"}).status_code == 401

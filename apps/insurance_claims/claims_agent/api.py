@@ -4,7 +4,7 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 
-from fastapi import Cookie, FastAPI, HTTPException, Request, Response
+from fastapi import Cookie, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
@@ -87,8 +87,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if _rate_limited(f"create:{client}", settings.session_create_limit):
             raise HTTPException(status_code=429, detail="Too many new conversations. Please wait a minute.")
         agent.sessions.prune()
-        _set_cookie(response, agent.new_session(channel_token=body.channel_token if body else None))
-        return {"ok": True, "mode": settings.agent_mode, "debug_panel": settings.debug_panel}
+        sid = agent.new_session(channel_token=body.channel_token if body else None)
+        _set_cookie(response, sid)
+        out = {"ok": True, "mode": settings.agent_mode, "debug_panel": settings.debug_panel}
+        if settings.allow_header_sessions:  # tooling (red-team harness) only; ids are still server-issued
+            out["session_id"] = sid
+        return out
 
     @app.post("/api/reset")
     def reset(response: Response, sid: str | None = Cookie(default=None)) -> dict:
@@ -98,7 +102,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"ok": True}
 
     @app.post("/api/chat")
-    def chat(body: ChatIn, sid: str | None = Cookie(default=None)) -> dict:
+    def chat(body: ChatIn, sid: str | None = Cookie(default=None),
+             x_session_id: str | None = Header(default=None)) -> dict:
+        if settings.allow_header_sessions and x_session_id:
+            sid = x_session_id
         if not sid:
             raise HTTPException(status_code=401, detail="No session. Start a new conversation.")
         if _rate_limited(f"chat:{sid}", RATE_LIMIT):
