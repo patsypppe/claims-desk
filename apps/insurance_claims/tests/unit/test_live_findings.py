@@ -69,3 +69,10 @@ def test_self_caller_keeps_own_name_even_if_llm_sets_speaker_name():
                        speaker_role="self", speaker_name="Margaret Chen")
     names = [c.raw_value for c in M("Hi, I'm Margaret Chen.", llm).pii_candidates if c.field == "name"]
     assert names == ["Margaret Chen"]
+
+
+def test_llm_claim_id_that_is_not_a_claim_id_is_rejected():
+    text = "My name is Margaret Chen, policy POL-9921. I'm calling about my denied healthcare claim from January."
+    from claims_agent.extraction.schema import IntentHintsIn
+    merged = M(text, TurnAnalysis(intent=IntentHintsIn(claim_id="POL-9921")))
+    assert merged.intent.claim_id is None

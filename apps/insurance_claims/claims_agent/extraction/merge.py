@@ -60,7 +60,8 @@ def _merge_pii(rules: list[PiiCandidate], llm: list[PiiCandidate], text: str, tu
 def _merge_intent(rules: IntentHintsIn, llm: IntentHintsIn, text: str, turn: int, events: list) -> IntentHintsIn:
     claim_id = rules.claim_id
     if not claim_id and llm.claim_id:
-        if normalize_claim_id(text) == normalize_claim_id(llm.claim_id or ""):
+        llm_id = normalize_claim_id(llm.claim_id)
+        if llm_id is not None and llm_id == normalize_claim_id(text):  # None == None must not pass the gate
             claim_id = llm.claim_id
         else:
             events.append(_rejected("claim_id", turn))
