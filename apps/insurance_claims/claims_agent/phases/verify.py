@@ -32,8 +32,20 @@ OTP_CODE_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
 def _verified(ctx: StepContext, state: ConversationState, party_id: str, method: str = "self") -> Decision:
     state = state.model_copy(update={"verification": Verification(verified=True, party_id=party_id, method=method),
                                      "expected_field": None, "otp_pending": False})
+    record_verification(ctx, state)
     state = ctx.transition(state, Phase.RESOLVE_INTENT, "identity_verified")
     return resolve.handle(ctx, state, just_verified=True)
+
+
+def record_verification(ctx: StepContext, state: ConversationState) -> None:
+    """Documentation of how identity (and any representative authority) was established."""
+    from claims_agent.audit import AuditEvent
+
+    detail = {"method": state.verification.method, "factors": sorted(state.current_values()),
+              "party_id": state.verification.party_id}
+    if state.verification.method == "representative":
+        detail["representative"] = {"name": state.speaker.rep_name, "relationship": state.speaker.relationship}
+    ctx.events.append(AuditEvent(kind="verification_record", detail=detail, turn=state.turn))
 
 
 def failed(ctx: StepContext, state: ConversationState, candidate: str | None) -> Decision:

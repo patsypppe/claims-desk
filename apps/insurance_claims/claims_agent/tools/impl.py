@@ -74,14 +74,30 @@ def send_summary_email(reg, state: ConversationState, subject: str = "", body: s
     return ToolResult(ok=True, facts=(fact,), data={"message_id": message_id, "masked_to": masked})
 
 
+def _verification_summary(state: ConversationState) -> dict:
+    """What a human agent needs to NOT re-verify: method, masked factors, representative authority."""
+    v = state.verification
+    rep = None
+    if v.method == "representative":
+        rep = {"name": state.speaker.rep_name, "relationship": state.speaker.relationship,
+               "policyholder_consent": "approved"}
+    return {"method": v.method if v.verified else None,
+            "factors": {f: o.masked for f in PII_FIELDS if (o := state.current(f))},
+            "representative": rep}
+
+
 def escalate_to_human(reg, state: ConversationState, reason: str = "unspecified") -> ToolResult:
     verified = state.verification.verified
+    summary = assemble_summary(reg.repo, state, reg.clock.today()).body if verified else None
     payload = {
         "reason": reason,
         "phase": state.phase.value,
         "party_id": state.verification.party_id if verified else None,
         "selected_case_id": state.selected_case_id if verified else None,
         "captured_fields": {f: o.masked for f in PII_FIELDS if (o := state.current(f))},
+        "verification": _verification_summary(state),
+        "case_summary": summary,
+        "topic": state.intent.topic,
         "counters": state.counters.model_dump(),
     }
     ticket_id = reg.handoff.create(payload)

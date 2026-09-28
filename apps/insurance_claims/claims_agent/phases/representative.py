@@ -16,6 +16,7 @@ def _refuse(ctx: StepContext, state: ConversationState) -> Decision:
 def _approved(ctx: StepContext, state: ConversationState, party_id: str) -> Decision:
     verification = Verification(verified=True, party_id=party_id, method="representative")
     state = state.model_copy(update={"verification": verification, "expected_field": None})
+    verify.record_verification(ctx, state)
     state = ctx.transition(state, Phase.RESOLVE_INTENT, "representative_authorized")
     return resolve.handle(ctx, state, just_verified=True, representative=True)
 
