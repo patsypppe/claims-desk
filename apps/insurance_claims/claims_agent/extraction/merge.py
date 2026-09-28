@@ -58,7 +58,16 @@ def _merge_pii(rules: list[PiiCandidate], llm: list[PiiCandidate], text: str, tu
     return merged, events
 
 
-def _merge_intent(rules: IntentHintsIn, llm: IntentHintsIn, text: str, turn: int, events: list) -> IntentHintsIn:
+def _without_dob(text: str, pii: list[PiiCandidate]) -> str:
+    """The caller's text minus any date of birth, so a birth month/year never becomes a claim-date hint."""
+    for c in pii:
+        if c.field == "dob" and c.raw_value and c.raw_value in text:
+            text = text.replace(c.raw_value, " ")
+    return text
+
+
+def _merge_intent(rules: IntentHintsIn, llm: IntentHintsIn, text: str, turn: int, events: list,
+                  date_text: str | None = None) -> IntentHintsIn:
     claim_id = rules.claim_id
     if not claim_id and llm.claim_id:
         llm_id = normalize_claim_id(llm.claim_id)
@@ -66,7 +75,8 @@ def _merge_intent(rules: IntentHintsIn, llm: IntentHintsIn, text: str, turn: int
             claim_id = llm.claim_id
         else:
             events.append(_rejected("claim_id", turn))
-    month_word = bool(re.search(MONTH_ALT, text, re.I))
+    date_text = text if date_text is None else date_text
+    month_word = bool(re.search(MONTH_ALT, date_text, re.I))
     pick = lambda r, l, default=None: l if l not in (None, "none", default) else r  # noqa: E731
     from claims_agent.extraction.lexicon import TYPE_SUPPORT
 
@@ -74,7 +84,7 @@ def _merge_intent(rules: IntentHintsIn, llm: IntentHintsIn, text: str, turn: int
     return IntentHintsIn(
         case_type=rules.case_type or llm_type, status=pick(rules.status, llm.status),
         month=rules.month or (llm.month if month_word else None),
-        year=rules.year or (llm.year if llm.year and str(llm.year) in text else None),
+        year=rules.year or (llm.year if llm.year and str(llm.year) in date_text else None),
         claim_id=claim_id, topic=pick(rules.topic, llm.topic), followup_topic=pick(rules.followup_topic, llm.followup_topic),
         asked_attribute=pick(rules.asked_attribute, llm.asked_attribute),
         documents_mentioned=sorted({d for d in rules.documents_mentioned + llm.documents_mentioned if _in_text(d, text)}),
@@ -134,7 +144,8 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
     policy = rules.policy_number
     if not policy and llm.policy_number:
         policy = llm.policy_number if normalize_policy(text) == normalize_policy(llm.policy_number) else None
-    intent = _merge_intent(rules.intent, llm.intent, text, turn, events)
+    intent = _merge_intent(rules.intent, llm.intent, text, turn, events,
+                           date_text=_without_dob(text, rules.pii_candidates + pii))
     relationship = rules.stated_relationship or (
         llm.stated_relationship if _in_text(llm.stated_relationship, text) else None)
     speaker = rules.speaker_name or (llm.speaker_name if _in_text(llm.speaker_name, text) else None)

@@ -88,3 +88,17 @@ def test_llm_only_third_party_label_on_a_name_correction_is_not_trusted():
                                   "I'm calling for my client, the policy is in her name."])
 def test_llm_third_party_label_with_a_relation_cue_in_text_is_kept(text):
     assert M(text, TurnAnalysis(speaker_role="third_party")).speaker_role == "third_party"
+
+
+@pytest.mark.parametrize("text", ["Ma Tian, date of birth September 10 1964, national ID last four 6688.",
+                                  "I'm Ma Tian, born September 10, 1964."])
+def test_llm_month_and_year_taken_from_the_date_of_birth_are_not_claim_hints(text):
+    from claims_agent.extraction.schema import IntentHintsIn
+    merged = M(text, TurnAnalysis(intent=IntentHintsIn(month=9, year=1964)))
+    assert (merged.intent.month, merged.intent.year) == (None, None)
+
+
+def test_llm_month_hint_outside_the_date_of_birth_is_kept():
+    from claims_agent.extraction.schema import IntentHintsIn
+    text = "Ma Tian, born September 10 1964, calling about my March claim."
+    assert M(text, TurnAnalysis(intent=IntentHintsIn(month=3))).intent.month == 3
