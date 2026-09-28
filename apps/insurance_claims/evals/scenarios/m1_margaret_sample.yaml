@@ -4,6 +4,8 @@ tags: [happy_path, sample]
 description: Spec §18 sample — everything in one utterance; intent survives verification.
 oracle_factors: {name: Margaret Chen, dob: "1985-03-15", id_last4: "4472", policy_number: POL-9921}
 expected_outcome: {terminal: COMPLETE, case_id: CL-2048, escalated: false, optimal_turns: 5}
+expected_tool_trace: [verify_identity, search_claims, get_claim_details, get_followup_guidance, build_summary, send_summary_email]
+end_state: {emails_sent: 1, ticket: false, consent: SENT}
 turns:
   - user: "I'm the policyholder. My name is Margaret Chen, policy POL-9921. I'm calling about my denied healthcare claim from January. DOB is 1985-03-15, SSN last four is 4472."
     expect:

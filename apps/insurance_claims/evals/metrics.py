@@ -75,6 +75,7 @@ def compute_metrics(results: list[ScenarioResult]) -> dict:
         "validator_rejections": _count(turns, "validator_reject"),
         "template_fallbacks": _count(turns, "fallback_used"),
         "quality": {"numerator": None, "denominator": None, "value": _quality(results)},
+        "pass_hat_k": {"numerator": None, "denominator": None, "value": pass_hat_k(results)},
     }
 
 
@@ -102,3 +103,15 @@ def _avg_turns(completed: list[ScenarioResult]) -> dict:
     optimal = [r.scenario.expected_outcome.get("optimal_turns", len(r.turns)) for r in completed]
     return {"numerator": sum(actual), "denominator": len(actual), "value": sum(actual) / len(actual),
             "efficiency": sum(optimal) / sum(actual)}
+
+
+def pass_hat_k(results: list[ScenarioResult]) -> dict | None:
+    """tau-bench pass^k: a scenario counts only if ALL k repeats passed (reliability, not best-of-k)."""
+    groups: dict[str, list[bool]] = {}
+    for r in results:
+        groups.setdefault(r.scenario.id, []).append(r.passed)
+    k = min((len(v) for v in groups.values()), default=0)
+    if k < 2:
+        return None
+    return {"k": k, "scenarios": len(groups),
+            "pass_hat_k": round(sum(all(v[:k]) for v in groups.values()) / len(groups), 3)}

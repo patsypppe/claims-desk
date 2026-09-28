@@ -47,6 +47,8 @@ class Scenario(BaseModel):
     verification_policy: str = "any3_or_otp"
     oracle_factors: dict[str, str] | None = None
     expected_outcome: dict[str, Any] = Field(default_factory=dict)
+    expected_tool_trace: list[str] = Field(default_factory=list)   # ordered subsequence of executed tools
+    end_state: dict[str, Any] = Field(default_factory=dict)        # emails_sent, ticket, consent
     turns: list[ScenarioTurn]
 
 
