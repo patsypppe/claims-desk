@@ -124,18 +124,27 @@ class Agent:
         with self._session_lock(session_id):  # one turn at a time per session: no lost updates / double sends
             return self._handle(session_id, text, sensitive)
 
+    def _repeat(self, state, events: list) -> TurnResult:
+        """Re-send the previous (already validated, same authorization) reply; state does not advance."""
+        self.sessions.save(state)
+        events.append(AuditEvent(kind="repair", detail={"pattern": "repeat"}, turn=state.turn))
+        return TurnResult(reply=f"Of course. {state.last_reply}", snapshot=snapshot(state), events=tuple(events))
+
     def _handle(self, session_id: str, text: str, sensitive: bool) -> TurnResult:
         state = self.sessions.get(session_id)
         text = (text or "")[:MAX_INPUT_CHARS]
         state = state.model_copy(update={"turn": state.turn + 1})
         analysis, events, degraded = self._understand(state, text, sensitive)
+        if analysis.requested_action == "repeat" and state.last_reply:
+            return self._repeat(state, events)
         state, conflicts = apply_analysis(state, analysis, turn=state.turn, today=self.clock.today())
         state = state.model_copy(update={"degraded": degraded})
         decision = self.controller.step(state, analysis, text, conflicts)
         ctx = build_context(decision, self.repo)
         reply, cited, respond_events = self._respond(ctx, text, state.turn)
         final = decision.state.model_copy(update={
-            "disclosed_fact_ids": tuple(dict.fromkeys(decision.state.disclosed_fact_ids + tuple(cited)))})
+            "disclosed_fact_ids": tuple(dict.fromkeys(decision.state.disclosed_fact_ids + tuple(cited))),
+            "last_reply": reply})
         self.sessions.save(final)
         all_events = tuple(events) + decision.events + tuple(respond_events)
         return TurnResult(reply=reply, snapshot=snapshot(final), events=all_events,

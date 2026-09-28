@@ -65,6 +65,7 @@ class StepContext:
         self.events: list[AuditEvent] = []
         self.emotion: EmotionStrategy = NEUTRAL
         self.option_facts: tuple[Fact, ...] = ()
+        self.restarted = False
 
     def call(self, tool: str, state: ConversationState, **args) -> ToolResult:
         result, event = self.ctl.registry.call(tool, state, **args)
@@ -78,6 +79,9 @@ class StepContext:
 
     def decide(self, state: ConversationState, action: ControllerAction, **kw) -> Decision:
         details = kw.get("details") or {}
+        if self.restarted:
+            details = {**details, "restarted": True}
+            kw["details"] = details
         offers_human = details.get("offer_human") or self.emotion.offer_human or details.get("implicit_offer")
         if offers_human and state.phase not in (Phase.ESCALATED, Phase.COMPLETE, Phase.POST_PROCESS):
             reason = details.get("offer_reason") or details.get("implicit_offer") or "caller_request"

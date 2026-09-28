@@ -6,7 +6,7 @@ from claims_agent.grounding.facts import Fact
 from claims_agent.phases import post, process, resolve, verify
 from claims_agent.policy.emotion import HEATED, strategy_for
 from claims_agent.policy.scope import decide_scope
-from claims_agent.state import ConversationState, Phase
+from claims_agent.state import ConsentState, ConversationState, IntentHints, Phase
 
 # Side-effecting tools (escalation, consent requests, email) can only be invoked by the controller's own flow.
 REQUESTABLE_TOOLS = frozenset({"search_claims", "get_claim_details", "get_followup_guidance", "get_document_guidance"})
@@ -60,8 +60,26 @@ def run(ctx: StepContext, state: ConversationState) -> Decision:
         return ctx.escalate(state, "caller_request")
     if offer and analysis.consent_signal == "YES" and analysis.requested_action != "ask_question":
         return ctx.escalate(state, offer)
+    if analysis.requested_action == "start_over":
+        return _start_over(ctx, state)
     scoped = _scope(ctx, state)
     return scoped if scoped is not None else HANDLERS[state.phase](ctx, state)
+
+
+def _start_over(ctx: StepContext, state: ConversationState) -> Decision:
+    """Keep what must persist (verification, counters, refusals); clear the conversational thread."""
+    ctx.restarted = True
+    ctx.events.append(AuditEvent(kind="repair", detail={"pattern": "start_over"}, turn=state.turn))
+    if not state.verification.verified:
+        state = state.model_copy(update={"observed": (), "last_verification_key": None, "expected_field": None,
+                                         "intent": IntentHints(), "otp_pending": False})
+        return verify.handle(ctx, state)
+    state = state.model_copy(update={"intent": IntentHints(), "selected_case_id": None, "candidate_case_ids": (),
+                                     "awaiting_anything_else": False, "consent": ConsentState.NOT_OFFERED,
+                                     "offer_id": None})
+    if state.phase != Phase.RESOLVE_INTENT:
+        state = ctx.transition(state, Phase.RESOLVE_INTENT, "caller_start_over")
+    return resolve.handle(ctx, state)
 
 
 def _scope(ctx: StepContext, state: ConversationState) -> Decision | None:

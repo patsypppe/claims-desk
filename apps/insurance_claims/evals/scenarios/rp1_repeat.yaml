@@ -1,0 +1,10 @@
+id: rp1_repeat
+category: repair
+description: Caller asks the agent to repeat; same (validated) reply, state unchanged.
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", id_last4: "4472"}
+expected_outcome: {escalated: false, case_id: CL-2048}
+turns:
+  - user: "Margaret Chen, born March 15 1985, SSN ends in 4472. It's about my denied healthcare claim."
+    expect: {state: {selected_case_id: CL-2048}}
+  - user: "Sorry, can you repeat that?"
+    expect: {state: {phase: PROCESS_CASE, selected_case_id: CL-2048}, text: {must_reference: [CL-2048]}}

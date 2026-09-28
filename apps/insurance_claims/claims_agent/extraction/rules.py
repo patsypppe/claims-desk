@@ -91,6 +91,8 @@ class RuleExtractor:
         return list(dict.fromkeys(names))
 
     def _refusals(self, text: str, expected: str | None) -> list[PiiCandidate]:
+        if lx.SKIP_RE.search(text) and expected in PII_FIELDS:
+            return [PiiCandidate(field=expected, raw_value="", caller_refused=True)]
         if not lx.REFUSAL_RE.search(text):
             return []
         if lx.REFUSE_ALL_RE.search(text):
@@ -182,6 +184,9 @@ class RuleExtractor:
 
     @staticmethod
     def _action(text: str) -> str:
+        for action, pattern in (("repeat", lx.REPEAT_RE), ("start_over", lx.START_OVER_RE), ("skip", lx.SKIP_RE)):
+            if pattern.search(text):
+                return action
         if lx.HUMAN_RE.search(text):
             return "request_human"
         if lx.OTHER_EMAIL_RE.search(text):

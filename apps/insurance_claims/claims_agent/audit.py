@@ -5,7 +5,7 @@ from claims_agent.domain.models import FrozenModel
 
 AuditKind = Literal["transition", "tool_called", "tool_blocked", "tool_failed", "validator_reject",
                     "fallback_used", "llm_value_rejected", "injection_flagged", "escalated", "consent",
-                    "pii_captured", "llm_degraded", "guard_scored", "verification_record"]
+                    "pii_captured", "llm_degraded", "guard_scored", "verification_record", "repair"]
 
 
 def _mask_word(word: str) -> str:

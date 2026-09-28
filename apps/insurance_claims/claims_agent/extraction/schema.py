@@ -62,7 +62,7 @@ class TurnAnalysis(_Strict):
     emotion: Emotion = Field(default_factory=Emotion)
     consent_signal: Literal["YES", "NO", "AMBIGUOUS", "NONE"] = "NONE"
     requested_action: Literal["provide_info", "ask_question", "done", "request_human", "request_other_email",
-                              "other"] = "provide_info"
+                              "repeat", "start_over", "skip", "other"] = "provide_info"
     tool_requests: list[ToolRequest] = Field(default_factory=list)
     injection_suspected: bool = False
     social_engineering: bool = False

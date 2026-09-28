@@ -1,0 +1,13 @@
+id: rp3_skip_question
+category: repair
+tags: [recovery]
+description: Skipping a verification question is treated as declining that field; another is offered.
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", email: margaret@email.com}
+expected_outcome: {escalated: false}
+turns:
+  - user: "I'm Margaret Chen, DOB 1985-03-15"
+    expect: {state: {expected_field: id_last4}}
+  - user: "Can we skip this question?"
+    expect: {state: {refused_fields: [id_last4]}, text: {asks_for_any: [phone, email]}}
+  - user: "margaret@email.com"
+    expect: {state: {verified: true}}

@@ -95,6 +95,8 @@ EMAIL_EVIDENCE_RE = re.compile(r"[\w.+-]+@[\w-]+\.|\b(other|different|another|ne
 
 def _merge_action(rules: str, llm: str, text: str, injection: bool) -> str:
     """High-impact actions need deterministic corroboration; an LLM label alone never escalates or re-routes."""
+    if rules in ("repeat", "start_over", "skip"):
+        return rules
     if "request_human" == rules or (llm == "request_human" and not injection and PERSON_WORD_RE.search(text)):
         return "request_human"
     if "request_other_email" == rules or (llm == "request_other_email" and EMAIL_EVIDENCE_RE.search(text)):

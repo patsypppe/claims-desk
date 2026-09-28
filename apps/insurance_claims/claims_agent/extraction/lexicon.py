@@ -102,3 +102,7 @@ SUBJECT_RE = re.compile(r"(?i:on behalf of|calling for|calling about|for)\s+(?i:
 SELF_RELATION_RE = re.compile(r"\bi'?m (?:her|his|their) (\w+)", re.I)
 SUBJECT_RELATION_RE = re.compile(r"\bmy (mother|mom|mum|father|dad|parent|wife|husband|spouse|son|daughter)\b", re.I)
 SUBJECT_NAME_RE = re.compile(r"\b(?i:her|his|their) name is ([A-Z][a-zA-Z'-]+\s+[A-Z][a-zA-Z'-]+)")
+REPEAT_RE = re.compile(r"(repeat that|say that again|come again|what did you (just )?say|pardon\??$|"
+                       r"didn'?t (quite )?catch that|one more time)", re.I)
+START_OVER_RE = re.compile(r"(start (over|again|fresh)|begin again|from the (top|beginning)|restart)", re.I)
+SKIP_RE = re.compile(r"(skip (this|that|it)( one| question)?|next question|pass on (this|that))", re.I)

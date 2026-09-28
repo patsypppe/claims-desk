@@ -231,6 +231,8 @@ def emotion_parts(ctx: ResponseContext, body: str) -> list[str]:
 
 def render(ctx: ResponseContext) -> str:
     body = RENDERERS[ctx.action](ctx)
+    if ctx.details.get("restarted"):
+        body = "No problem, let's start over. " + body
     suffix = ""
     if ctx.emotion.offer_human and ctx.action not in (A.ESCALATE, A.ESCALATED_HOLD) and "member of our team" not in body:
         suffix = " If you'd prefer, I can also connect you with a member of our team."
