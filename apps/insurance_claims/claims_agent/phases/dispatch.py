@@ -6,11 +6,13 @@ from claims_agent.grounding.facts import Fact
 from claims_agent.phases import post, process, resolve, verify
 from claims_agent.policy.emotion import HEATED, EmotionStrategy, strategy_for
 
+from claims_agent.policy.scope import decide_scope
+from claims_agent.state import ConsentState, ConversationState, IntentHints, Phase
+
 MANIPULATION = EmotionStrategy(label="manipulation", steps=("explain_requirement", "return_to_action"))
 THREAT = EmotionStrategy(label="threat", intensity="high", steps=("set_boundary", "explain_requirement",
                                                                    "return_to_action"), offer_human=True)
-from claims_agent.policy.scope import decide_scope
-from claims_agent.state import ConsentState, ConversationState, IntentHints, Phase
+CARE = EmotionStrategy(label="distress", intensity="high", steps=())
 
 # Side-effecting tools (escalation, consent requests, email) can only be invoked by the controller's own flow.
 REQUESTABLE_TOOLS = frozenset({"search_claims", "get_claim_details", "get_followup_guidance", "get_document_guidance"})
@@ -55,9 +57,10 @@ def run(ctx: StepContext, state: ConversationState) -> Decision:
                                already_acknowledged=previous_emotion == analysis.emotion.label)
     if analysis.social_engineering and not state.verification.verified:
         ctx.emotion = MANIPULATION  # neutral: restate the requirement, no "fair question" pleasantries
-    if analysis.threat:
+    if analysis.threat and not analysis.wellbeing_risk:
         ctx.emotion = THREAT
     if analysis.wellbeing_risk:  # people before process: care + crisis resources + a human, in any phase
+        ctx.emotion = CARE  # never boundary/"be respectful" language to someone at risk, whatever else was flagged
         if state.escalation.active:
             return ctx.decide(state, A.CRISIS_SUPPORT)
         return ctx.escalate(state, "wellbeing_concern")

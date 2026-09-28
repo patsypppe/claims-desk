@@ -77,8 +77,12 @@ class RuleExtractor:
 
     def _names(self, text: str, expected: str | None) -> list[str]:
         names = []
-        for m in lx.SPELLED_RE.finditer(text):  # "M-A-R-G-A-R-E-T" spelled out letter by letter
+        spelling = expected == "name" or lx.NAME_SPELL_CUE_RE.search(text)
+        for m in lx.SPELLED_RE.finditer(text) if spelling else ():  # "M-A-R-G-A-R-E-T" spelled letter by letter
             word = re.sub(r"[-\s]", "", m.group(1))
+            near_digits = re.search(r"\d", text[max(0, m.start() - 2):m.end() + 2])  # "C-L-M 2048" is an id
+            if near_digits or ("-" not in m.group(1) and not word.isupper()):  # "u r a" is texting, not spelling
+                continue
             if len(word) >= 3:
                 names.append(word.capitalize())
                 break
@@ -200,6 +204,8 @@ class RuleExtractor:
 
     @staticmethod
     def _action(text: str, has_data: bool = False) -> str:
+        if lx.HUMAN_RE.search(text):  # asking for a person always wins
+            return "request_human"
         if lx.READBACK_RE.search(text):
             return "readback"
         if not has_data and len(text.split()) <= 10:  # repairs are short, standalone utterances

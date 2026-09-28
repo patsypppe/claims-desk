@@ -68,7 +68,8 @@ def resolve(claims: tuple[Claim, ...], hints: IntentHints) -> Resolution:
 def pick_option(options: tuple[CaseOption, ...], hints: IntentHints, text: str) -> str | None:
     """Match a disambiguation reply to exactly one option, or None."""
     low = text.lower()
-    if len(options) == 1 and re.search(r"\b(yes|yeah|yep|sure|ok(?:ay)?|that one|please|go ahead)\b", low):
+    negated = re.search(r"\b(no|nope|nah|not|different|another|other|wrong)\b", low)
+    if len(options) == 1 and not negated and re.search(r"\b(yes|yeah|yep|sure|ok(?:ay)?|that one|please|go ahead)\b", low):
         return options[0].case_id
     if hints.claim_id:
         return next((o.case_id for o in options if o.case_id == hints.claim_id), None)

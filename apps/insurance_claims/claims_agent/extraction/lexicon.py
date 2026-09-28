@@ -115,18 +115,27 @@ START_OVER_RE = re.compile(r"^\W*(?:actually[,.]?\s*|ok(?:ay)?[,.]?\s*|so[,.]?\s
                            re.I)
 SKIP_RE = re.compile(r"^\W*(?:(?:can|could) we |let'?s |please |i'?d like to )?(?:skip (?:this|that|it)(?: one| "
                      r"question)?|next question|pass on (?:this|that))\b", re.I)
-CRISIS_RE = re.compile(r"(kill(?:ing)? myself|end it all|end my life|suicid|(?:don'?t|no) see (?:the|any) point in "
-                       r"living|no point (?:in )?living|want to die|take my (?:own )?life|hurt(?:ing)? myself|"
-                       r"can'?t go on|better off dead)", re.I)
-THREAT_RE = re.compile(r"(make you (?:all )?pay|come (?:down )?to your office|i'?ll (?:hurt|find|get) you|you'?ll regret|"
-                       r"i know where you|watch your back|burn (?:it|the place) down)", re.I)
-READBACK_RE = re.compile(r"(read (?:me )?back|what(?:'?s| is) my (?:full )?(?:ssn|social|phone(?: number)?|email|date of "
-                         r"birth|dob|address)|what (?:date of birth|dob|phone(?: number)?|email(?: address)?|ssn|social) "
-                         r"do you have|full (?:ssn|social|phone number)|tell me my (?:ssn|social|dob|date of birth|phone))",
-                         re.I)
+CRISIS_RE = re.compile(r"(kill(?:ing)? myself|\bkms\b|end it all|end my (?:own )?life|suicid|"
+                       r"(?:don'?t|no) see (?:the|any) point (?:in|of) (?:living|going on|life)|no point (?:in )?(?:living|going on)|"
+                       r"(?:want|wanna) (?:to )?die|don'?t want to (?:live|be alive|be here)|no reason to (?:live|keep going|go on)|"
+                       r"take my (?:own )?life|(?:want|going|planning|thinking about|thought about|feel like)(?: to)? "
+                       r"(?:hurt|harm|cut)(?:ting)? myself|self[- ]harm|\bi can'?t go on(?:\s*$|[.!,]| anymore| living)|"
+                       r"better off dead)", re.I)
+THREAT_RE = re.compile(r"(make you (?:all )?pay|(?:come|show up) (?:down )?(?:to|at) your (?:office|building|house) "
+                       r"(?:and|to) (?:make|teach|show|hurt|deal|get)|i'?ll (?:hurt|kill) you|i'?ll find you and|"
+                       r"you'?ll regret|i know where you|watch your back|burn (?:it|the place) down)", re.I)
+# corroboration an LLM "threat" label needs before the reply sets a boundary
+HOSTILE_CUE_RE = re.compile(r"\b(hurt|harm|kill|shoot|stab|regret|find you|where you (?:live|work)|watch your back|burn|"
+                            r"destroy|beat (?:you|up)|punch|smash|make you (?:all )?pay|come after)\b", re.I)
+_IDENT = r"(?:ssn|social(?: security)?(?: number)?|phone(?: number)?|email(?: address)?|date of birth|dob|birth ?date|address)"
+READBACK_RE = re.compile(r"(read (?:me )?back (?:my |the )?(?:full )?" + _IDENT + r"|what(?:'?s| is) my (?:full )?" + _IDENT
+                         + r"(?: (?:on file|you have|in (?:the|your) system|again))?\s*(?:[?.!]|$)|what " + _IDENT
+                         + r" do you have|(?:tell|give|read|show) me (?:my|the) full " + _IDENT + r"|tell me my " + _IDENT
+                         + r")", re.I)
 POSSESSIVE_REL_RE = re.compile(r"\bi'?m\s+(?:[A-Z][a-zA-Z'-]+\s+){1,3}?[A-Z][a-zA-Z-]*'s\s+(husband|wife|son|daughter|mother|"
                                r"father|partner|brother|sister|friend|caregiver|spouse)\b")
 SPELLED_RE = re.compile(r"\b([A-Za-z](?:[-\s][A-Za-z]){2,})\b")
+NAME_SPELL_CUE_RE = re.compile(r"(\bname\b|\bspell|\bsorry\b|\bthat'?s\b|\bit'?s\b|\bi'?m\b|\bthis is\b)", re.I)
 TYPE_SUPPORT = {
     "auto": re.compile(r"\b(auto|car|vehicle|truck|accident|crash|collision|repair|bumper|windshield|motor)", re.I),
     "healthcare": re.compile(r"\b(health|medical|doctor|hospital|clinic|surg|mri|scan|x-?ray|lab|patholog|prescri|"

@@ -4,6 +4,7 @@ Principle: extract now, act when authorized. Nothing in this module can change v
 selected case, consent or escalation — those belong to the controller.
 """
 import re
+from difflib import SequenceMatcher
 from datetime import date
 
 from claims_agent.audit import AuditEvent, mask
@@ -176,7 +177,7 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
                                              if t.name not in {r.name for r in rules.tool_requests}],
         injection_suspected=rules.injection_suspected or llm.injection_suspected,
         wellbeing_risk=rules.wellbeing_risk or llm.wellbeing_risk,
-        threat=rules.threat or llm.threat,
+        threat=rules.threat or (llm.threat and bool(lx.HOSTILE_CUE_RE.search(text))),
     )
     return merged, events
 
@@ -224,6 +225,10 @@ def _apply_pii(state: ConversationState, analysis: TurnAnalysis, turn: int, toda
         if values:
             value = values[-1]
             current = state.current(field)
+            if field == "name" and len(value.split()) == 1 and state.expected_field != "name":
+                first = current.normalized.split()[0] if current and len(current.normalized.split()) >= 2 else None
+                if first is None or SequenceMatcher(None, value.lower(), first.lower()).ratio() < 0.7:
+                    continue  # "That's Ridiculous" / "it's Tuesday" is not a name correction
             if field == "name" and current and len(value.split()) == 1 and len(current.normalized.split()) >= 2:
                 value = " ".join([value] + current.normalized.split()[1:])  # "that's Margaret" fixes the first name
             observed = _store_field(observed, field, value, turn, "rules")

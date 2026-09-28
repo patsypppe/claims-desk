@@ -14,6 +14,14 @@ def unify_dashes(text: str) -> str:
     return text.translate(_DASH_TABLE)
 
 
+_QUOTE_TABLE = str.maketrans({"\u2018": "'", "\u2019": "'", "\u02bc": "'", "\u2032": "'", "\u201c": '"', "\u201d": '"'})
+
+
+def unify_quotes(text: str) -> str:
+    """iOS/macOS keyboards type curly apostrophes by default; every "I'm"/"X's" pattern expects a straight one."""
+    return text.translate(_QUOTE_TABLE)
+
+
 def month_number(token: str) -> int | None:
     token = token.lower().rstrip(".")
     return next((num for name, num in MONTHS.items() if name.startswith(token[:3]) and len(token) >= 3), None)
