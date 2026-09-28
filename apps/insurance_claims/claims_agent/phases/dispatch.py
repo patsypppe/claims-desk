@@ -8,6 +8,8 @@ from claims_agent.policy.emotion import HEATED, strategy_for
 from claims_agent.policy.scope import decide_scope
 from claims_agent.state import ConversationState, Phase
 
+# Side-effecting tools (escalation, consent requests, email) can only be invoked by the controller's own flow.
+REQUESTABLE_TOOLS = frozenset({"search_claims", "get_claim_details", "get_followup_guidance", "get_document_guidance"})
 SENT_FACT = Fact(fact_id="tool.send_summary_email.result", label="email_sent", value="sent",
                  display="summary already emailed")
 HANDLERS = {
@@ -25,6 +27,11 @@ def _guard_tool_requests(ctx: StepContext, state: ConversationState) -> None:
     controller's own flow uses them); forbidden ones are blocked and audited.
     """
     for request in ctx.analysis.tool_requests:
+        if request.name not in REQUESTABLE_TOOLS:
+            ctx.events.append(AuditEvent.tool(kind="tool_blocked", tool=request.name, phase=state.phase.value,
+                                              consent=state.consent.value, turn=state.turn,
+                                              reason="not_requestable_by_model"))
+            continue
         args = {k: v for k, v in (("case_id", request.case_id), ("document", request.document)) if v}
         ctx.call(request.name, state, **args)
 

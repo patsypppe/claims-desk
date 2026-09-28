@@ -17,6 +17,9 @@ DOB_CUE_RE = re.compile(r"(dob|date of birth|birth\s*day|birthdate|born)", re.I)
 NAME_CUE_RE = re.compile(
     r"\b(?i:my name is|my name's|name is|i am|i'm|this is|it's)\s+((?:[A-Z][a-zA-Z'-]+)(?:\s+[A-Z][a-zA-Z'-]+){0,3})")
 LEADING_NAME_RE = re.compile(r"(?:^|[.!?]\s+)([A-Z][a-z'-]+(?:\s+[A-Z][a-z'-]+){1,3})\s*[,.;]")
+FILLER_WORDS = frozenset({"hold", "on", "one", "sec", "second", "moment", "minute", "hi", "hello", "hey", "there",
+                          "wait", "a", "ok", "okay", "yes", "no", "sure", "thanks", "thank", "you", "um", "uh", "hmm",
+                          "please", "just", "what", "why", "sorry", "fine", "good", "morning", "afternoon", "idk"})
 NAME_STOPWORDS = frozenset({"Healthcare", "Claim", "Dental", "Auto", "Hello", "Thanks", "Thank", "The", "Not", "Calling", "Here", "Just", "So", "Really", "Very", "Sorry", "Fine", "Ok",
                             "Okay", "Yes", "No", "Hi", "Hello", "SSN", "DOB", "I", "My", "Your", "Policy", "SYSTEM"})
 CORRECTION_RE = re.compile(r"\b(actually|i meant|correction|sorry,? (?:it'?s|my)|not .{1,30}, it'?s|wait)\b", re.I)
@@ -58,7 +61,7 @@ DONE_RE = re.compile(r"(that'?s (?:all|everything|it)|nothing else|no more quest
                      r"that is (?:all|everything)|i'?m good|all set)", re.I)
 OTHER_EMAIL_RE = re.compile(r"(send|email|forward) (?:it|this|the summary)? ?to (?:my |a )?(other|different|"
                             r"another|son|wife|husband|work|[\w.+-]+@)", re.I)
-YES_RE = re.compile(r"^\s*(yes|yeah|yep|sure|please do|please send|send it|go ahead|ok(?:ay)?|absolutely|"
+YES_RE = re.compile(r"^\s*(yes|yeah|yep|sure|please do|please send|send it|go ahead|absolutely|"
                     r"of course|definitely)\b|\b(yes,? please|please email|email (?:it|me))\b", re.I)
 NO_RE = re.compile(r"^\s*(no|nope|nah|don'?t|do not|skip|not now|no thanks?)\b|\b(no thanks|don'?t send|"
                    r"do not send|no need|skip it|actually no|changed my mind)\b", re.I)
@@ -93,3 +96,6 @@ ATTRIBUTE_RULES = (
 )
 SUBJECT_RE = re.compile(r"(?i:on behalf of|calling for|calling about|for)\s+(?i:my\s+\w+[,]?\s+)?"
                         r"([A-Z][a-zA-Z'-]+\s+[A-Z][a-zA-Z'-]+)")
+SELF_RELATION_RE = re.compile(r"\bi'?m (?:her|his|their) (\w+)", re.I)
+SUBJECT_RELATION_RE = re.compile(r"\bmy (mother|mom|mum|father|dad|parent|wife|husband|spouse|son|daughter)\b", re.I)
+SUBJECT_NAME_RE = re.compile(r"\b(?i:her|his|their) name is ([A-Z][a-zA-Z'-]+\s+[A-Z][a-zA-Z'-]+)")

@@ -31,7 +31,8 @@ def test_reset_keeps_party_lockout(repo):
         agent.handle(s2, line)
     s3 = agent.new_session()
     r = agent.handle(s3, "Margaret Chen, DOB 1985-03-15, SSN last four 4472")
-    assert not r.snapshot.verified and r.snapshot.escalation_reason == "locked_out"
+    # Locked record: even correct factors fail, with the SAME generic reply as any mismatch (no oracle).
+    assert not r.snapshot.verified and "wasn't able to verify" in r.reply
 
 
 def test_other_customers_unaffected_by_lockout(repo):

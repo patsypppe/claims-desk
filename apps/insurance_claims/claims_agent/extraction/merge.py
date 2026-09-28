@@ -80,8 +80,8 @@ def _merge_intent(rules: IntentHintsIn, llm: IntentHintsIn, text: str, turn: int
 def _merge_consent(rules: str, llm: str) -> str:
     if rules == llm:
         return rules
-    if llm == "YES" and rules not in ("NO", "AMBIGUOUS"):
-        return "YES"
+    if llm == "YES" and rules == "NONE":
+        return "AMBIGUOUS"  # consent is an action gate: an affirmative must also be visible to the rules
     if "NO" in (rules, llm) and "YES" not in (rules, llm):
         return "NO"
     return "AMBIGUOUS" if "NONE" not in (rules, llm) or "AMBIGUOUS" in (rules, llm) else rules
@@ -110,6 +110,8 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
         speaker_role="third_party" if "third_party" in (rules.speaker_role, llm.speaker_role)
         else (llm.speaker_role if llm.speaker_role != "unknown" else rules.speaker_role),
         stated_relationship=relationship,
+        stated_subject_relation=rules.stated_subject_relation or (
+            llm.stated_subject_relation if _in_text(llm.stated_subject_relation, text) else None),
         stated_subject_name=rules.stated_subject_name or (
             llm.stated_subject_name if _in_text(llm.stated_subject_name, text) else None),
         speaker_name=rules.speaker_name or (llm.speaker_name if _in_text(llm.speaker_name, text) else None),
@@ -187,7 +189,8 @@ def apply_analysis(state: ConversationState, analysis: TurnAnalysis, *, turn: in
         updates["speaker"] = state.speaker.model_copy(update={
             "role": "third_party",
             "rep_name": state.speaker.rep_name or analysis.speaker_name,
-            "relationship": state.speaker.relationship or analysis.stated_relationship})
+            "relationship": analysis.stated_relationship or state.speaker.relationship,
+            "subject_relation": analysis.stated_subject_relation or state.speaker.subject_relation})
     elif analysis.speaker_role == "self" and state.speaker.role == "unknown":
         updates["speaker"] = state.speaker.model_copy(update={"role": "self"})
     return state.model_copy(update=updates), conflicts

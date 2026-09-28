@@ -10,8 +10,14 @@ def present(ctx: StepContext, state: ConversationState, unmatched: tuple[str, ..
     if not result.ok:
         return ctx.escalate(state, "tool_failure")
     state = state.model_copy(update={"awaiting_anything_else": True})
-    return ctx.decide(state, A.PRESENT_CASE, facts=result.facts,
-                      details={"unmatched": list(unmatched), "topic": state.intent.topic, **(extra or {})})
+    details = {"unmatched": list(unmatched), "topic": state.intent.topic, **(extra or {})}
+    if deadline_passed(result.facts):
+        details["implicit_offer"] = "deadline_review"   # the deadline text offers a representative
+    return ctx.decide(state, A.PRESENT_CASE, facts=result.facts, details=details)
+
+
+def deadline_passed(facts) -> bool:
+    return any(f.label == "appeal_deadline_status" and f.value == "passed" for f in facts)
 
 
 def _switching_claim(ctx: StepContext, state: ConversationState) -> bool:
@@ -34,8 +40,10 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
     if _is_done(ctx, state):
         return post.enter(ctx, state)
     if _switching_claim(ctx, state):
+        from claims_agent.phases.resolve import turn_hints
+
         state = state.model_copy(update={"selected_case_id": None, "candidate_case_ids": (),
-                                         "awaiting_anything_else": False})
+                                         "awaiting_anything_else": False, "intent": turn_hints(ctx)})
         state = ctx.transition(state, Phase.RESOLVE_INTENT, "caller_switched_claim")
         return resolve.handle(ctx, state)
     result = ctx.call("get_claim_details", state)

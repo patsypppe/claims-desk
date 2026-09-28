@@ -68,7 +68,8 @@ class Verification(FrozenModel):
 class Speaker(FrozenModel):
     role: Literal["self", "third_party", "unknown"] = "unknown"
     rep_name: str | None = None
-    relationship: str | None = None
+    relationship: str | None = None        # caller's relation TO the policyholder ("son"), when stated
+    subject_relation: str | None = None    # policyholder's relation to the caller ("my mother" -> "mother")
 
 
 class Escalation(FrozenModel):

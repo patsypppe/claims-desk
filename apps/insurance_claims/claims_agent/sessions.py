@@ -4,33 +4,33 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Callable
 
-from claims_agent.domain.repository import FixtureRepository
 from claims_agent.state import ConversationState
-from claims_agent.verification import factor_matches
 
 
 class UnknownSessionError(KeyError):
     """Raised for session ids this server never issued (or that expired)."""
 
 
+LOCKOUT_WINDOW_S = 15 * 60
+
+
 @dataclass
 class LockoutRegistry:
-    """Counts failed verifications per candidate record across sessions (survives conversation reset)."""
-    failures: dict[str, int] = field(default_factory=dict)
+    """Failed verifications per candidate record across sessions, within a sliding window.
+
+    Consulted ONLY when a full factor set evaluates to that record, and a locked record gets the same generic
+    failure as any other mismatch, so the lockout can never be probed one field at a time.
+    """
+    now: Callable[[], float] = time.monotonic
+    failures: dict[str, list[float]] = field(default_factory=dict)
 
     def record_failure(self, party_id: str) -> None:
-        self.failures[party_id] = self.failures.get(party_id, 0) + 1
+        self.failures.setdefault(party_id, []).append(self.now())
 
-    def is_locked(self, state: ConversationState, repo: FixtureRepository, threshold: int) -> bool:
-        factors = state.current_values()
-        if not factors:
-            return False
-        for person in repo.policyholders:
-            if self.failures.get(person.party_id, 0) < threshold:
-                continue
-            if any(factor_matches(person, f, v) for f, v in factors.items()):
-                return True
-        return False
+    def is_locked(self, party_id: str, threshold: int) -> bool:
+        recent = [t for t in self.failures.get(party_id, []) if self.now() - t < LOCKOUT_WINDOW_S]
+        self.failures[party_id] = recent
+        return len(recent) >= threshold
 
 
 @dataclass

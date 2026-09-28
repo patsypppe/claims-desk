@@ -50,13 +50,13 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
     if ctx.conflicts:
         state = state.model_copy(update={"expected_field": ctx.conflicts[0]})
         return ctx.decide(state, A.CONFIRM_CONFLICT, details={"field": ctx.conflicts[0]})
-    if ctx.ctl.is_locked_out(state):
-        return ctx.escalate(state, "locked_out")
     factors = state.current_values()
     key = factor_key(state)
     if len(factors) >= MIN_FACTORS and key != state.last_verification_key:
         state = state.model_copy(update={"last_verification_key": key})
         result = ctx.call("verify_identity", state)
+        if result.ok and ctx.ctl.is_locked_out(result.data["party_id"]):
+            return failed(ctx, state, result.data["party_id"])  # same reply as any mismatch: no oracle
         if result.ok:
             return _verified(ctx, state, result.data["party_id"])
         if result.data.get("status") == "failed":
@@ -64,6 +64,10 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
     remaining = askable(state)
     if len(factors) + len(remaining) < MIN_FACTORS:
         return ctx.escalate(state, "insufficient_verification_factors")
+    if not remaining:  # every field supplied or refused and the set already failed: ask to re-confirm
+        alternatives = tuple(f for f in ASK_ORDER if f not in state.refused)
+        return ctx.decide(state.model_copy(update={"expected_field": None}), A.VERIFY_FAILED,
+                          alternatives=alternatives, details={"attempts_left": None})
     refused_now = [c.field for c in ctx.analysis.pii_candidates if c.caller_refused]
     state = state.model_copy(update={"expected_field": remaining[0] if remaining else None})
     action = A.OFFER_ALT_FIELD if refused_now else A.ASK_FIELDS

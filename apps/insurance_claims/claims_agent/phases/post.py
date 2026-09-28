@@ -49,6 +49,8 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
     analysis = ctx.analysis
     if analysis.requested_action == "request_other_email":
         return ctx.decide(state, A.OFFER_EMAIL, details={"other_address_refused": True})
+    if analysis.requested_action == "ask_question" or "?" in ctx.text:
+        return ctx.decide(state, A.CLARIFY_CONSENT, details={"preview": True})
     signal = analysis.consent_signal
     if signal == "YES":
         return _send(ctx, state)

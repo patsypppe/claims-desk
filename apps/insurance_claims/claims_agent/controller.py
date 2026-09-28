@@ -75,9 +75,10 @@ class StepContext:
 
     def decide(self, state: ConversationState, action: ControllerAction, **kw) -> Decision:
         details = kw.get("details") or {}
-        offers_human = details.get("offer_human") or self.emotion.offer_human
+        offers_human = details.get("offer_human") or self.emotion.offer_human or details.get("implicit_offer")
         if offers_human and state.phase not in (Phase.ESCALATED, Phase.COMPLETE, Phase.POST_PROCESS):
-            state = state.model_copy(update={"pending_human_offer": details.get("offer_reason", "caller_request")})
+            reason = details.get("offer_reason") or details.get("implicit_offer") or "caller_request"
+            state = state.model_copy(update={"pending_human_offer": reason})
         return Decision(state=state, action=action, emotion=self.emotion, events=tuple(self.events), **kw)
 
     def consent_event(self, state: ConversationState, outcome: str) -> AuditEvent:
@@ -105,10 +106,10 @@ class WorkflowController:
         if self.lockouts is not None and candidate_party_id:
             self.lockouts.record_failure(candidate_party_id)
 
-    def is_locked_out(self, state: ConversationState) -> bool:
-        if self.lockouts is None:
+    def is_locked_out(self, party_id: str | None) -> bool:
+        if self.lockouts is None or not party_id:
             return False
-        return self.lockouts.is_locked(state, self.repo, self.settings.lockout_failures)
+        return self.lockouts.is_locked(party_id, self.settings.lockout_failures)
 
     def step(self, state: ConversationState, analysis: TurnAnalysis, text: str,
              conflicts: list[str] | None = None) -> Decision:

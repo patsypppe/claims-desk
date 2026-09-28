@@ -28,6 +28,22 @@ def _clarify(ctx: StepContext, state: ConversationState, options) -> Decision:
                       facts=ctx.option_facts)
 
 
+def _narrow(ctx: StepContext, state: ConversationState, claims) -> Decision:
+    """Pick among the offered claims by ordinal/hints; narrow the list when hints help; count stalls."""
+    pool = tuple(c for c in claims if c.case_id in state.candidate_case_ids)
+    options = tuple(option_for(c) for c in pool)
+    picked = pick_option(options, turn_hints(ctx), ctx.text)
+    if picked:
+        return select(ctx, state, picked)
+    narrowed = resolve(pool, turn_hints(ctx))
+    if narrowed.action == "PRESENT_CASE":
+        return select(ctx, state, narrowed.case_id)
+    if narrowed.action == "DISAMBIGUATE_CASE" and len(narrowed.candidates) < len(pool):
+        state = state.model_copy(update={"candidate_case_ids": narrowed.candidates})
+        return _clarify(ctx, state, narrowed.options)
+    return _clarify(ctx, state, options)
+
+
 def handle(ctx: StepContext, state: ConversationState, just_verified: bool = False,
            representative: bool = False) -> Decision:
     result = ctx.call("search_claims", state)
@@ -38,9 +54,7 @@ def handle(ctx: StepContext, state: ConversationState, just_verified: bool = Fal
     ctx.option_facts = result.facts
     details = {"just_verified": just_verified, "rep_approved": representative}
     if state.candidate_case_ids and not just_verified:
-        options = tuple(option_for(c) for c in claims if c.case_id in state.candidate_case_ids)
-        picked = pick_option(options, turn_hints(ctx), ctx.text)
-        return select(ctx, state, picked) if picked else _clarify(ctx, state, options)
+        return _narrow(ctx, state, claims)
     if ctx.analysis.requested_action == "done" and not just_verified:
         from claims_agent.phases import post
 
@@ -52,8 +66,12 @@ def handle(ctx: StepContext, state: ConversationState, just_verified: bool = Fal
         state = state.model_copy(update={"candidate_case_ids": res.candidates})
         return ctx.decide(state, A.DISAMBIGUATE_CASE, options=res.options, details=details, facts=result.facts)
     if res.action == "NO_MATCHING_CASE":
-        state = state.model_copy(update={"intent": state.intent.model_copy(update={"claim_id": None})})
+        state = state.model_copy(update={"intent": state.intent.model_copy(update={"claim_id": None}),
+                                         "candidate_case_ids": tuple(c.case_id for c in claims)})
         return ctx.decide(state, A.NO_MATCHING_CASE, options=res.options, details=details, facts=result.facts)
     if res.action == "NO_CLAIMS":
         return ctx.decide(state.model_copy(update={"awaiting_anything_else": True}), A.NO_CLAIMS, details=details)
+    if len(claims) == 1:
+        return select(ctx, state, claims[0].case_id, (), details)
+    state = state.model_copy(update={"candidate_case_ids": tuple(c.case_id for c in claims)})
     return ctx.decide(state, A.ASK_INTENT, options=res.options, details=details, facts=result.facts)

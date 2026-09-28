@@ -30,6 +30,8 @@ ESCALATION_LEADS = {
                   "colleague.",
     "document_alternatives_exhausted": "Since the usual alternatives aren't available, a claims representative "
                                        "should review the file with you. I'm connecting you now.",
+    "deadline_review": "Of course. Since the appeal deadline has passed, I'm connecting you with a claims "
+                       "representative who can review your options.",
     "representative_consent_timeout": "I wasn't able to confirm the policyholder's authorization, so I'm "
                                       "connecting you with a colleague who can help.",
 }
@@ -50,7 +52,9 @@ def join_list(items: list[str]) -> str:
 
 
 def _or_list(items: list[str]) -> str:
-    labels = [FIELD_LABELS[i] for i in items]
+    labels = [FIELD_LABELS[i] for i in items if i in FIELD_LABELS]
+    if not labels:
+        return "the details you shared, so I can check them again"
     return labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + f", or {labels[-1]}"
 
 
@@ -64,6 +68,8 @@ def _verified_prefix(ctx: ResponseContext) -> str:
 
 def _ask_fields(ctx: ResponseContext) -> str:
     field = ctx.required_elements[0] if ctx.required_elements else None
+    if field not in FIELD_LABELS:
+        return GENERIC_FAILURE
     parts = []
     if ctx.details.get("protected_request"):
         parts.append(PROTECTED_EXPLANATION)
@@ -168,7 +174,10 @@ RENDERERS = {
                                  if ctx.details.get("other_address_refused") else "")
                                 + f"Would you like me to email a summary of today's call to the address on file "
                                 f"({ctx.masked_email})? Just say yes to send it or no to skip it."),
-    A.CLARIFY_CONSENT: lambda ctx: (f"Just to confirm: should I email the summary to {ctx.masked_email}? "
+    A.CLARIFY_CONSENT: lambda ctx: ((("The summary would include the claim we discussed, its status and the "
+                                      "reason on file, the documents still needed, the deadline status and next "
+                                      "steps. ") if ctx.details.get("preview") else "")
+                                    + f"Just to confirm: should I email the summary to {ctx.masked_email}? "
                                     "Please answer yes or no."),
     A.EMAIL_SENT: lambda ctx: f"Done. I've emailed the summary to {ctx.masked_email}. Thanks for calling!",
     A.EMAIL_FAILED: lambda ctx: ("I'm sorry, the summary email couldn't be sent just now, so nothing was sent. "

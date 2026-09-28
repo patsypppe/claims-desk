@@ -25,6 +25,12 @@ ACTION_CLAIMS = {
 }
 
 
+# When the deadline on file has passed, any wording that presents appeal time as still available is ungrounded.
+LIVE_DEADLINE_RE = re.compile(r"(still have \d+|\d+ (?:more )?days? (?:left|remaining|to appeal)|you have until|"
+                              r"(?:can|could|are able to) still (?:appeal|submit|file)|still (?:time|eligible|open) to|"
+                              r"deadline is (?:next|in \d|tomorrow|this|coming)|\buntil " + MONTH_ALT + r")", re.I)
+
+
 class ValidationResult(FrozenModel):
     ok: bool
     violations: tuple[str, ...] = ()
@@ -38,7 +44,8 @@ def _ngrams(text: str, n: int = 4) -> set[tuple[str, ...]]:
 def _amounts(text: str) -> set[str]:
     found = set()
     for m in re.finditer(r"(\$\s?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d{2})?|\b(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})\b|"
-                         r"\b(\d[\d,]*)\s*(?:dollars|usd)\b", text, re.I):
+                         r"\b(\d[\d,]*)\s*(?:dollars|usd)\b|\busd\s*\d[\d,]*(?:\.\d{2})?|\b\d{1,3}(?:,\d{3})+\b",
+                         text, re.I):
         raw = m.group(0).replace("$", "").replace(",", "").lower().replace("dollars", "").replace("usd", "").strip()
         try:
             found.add(f"{Decimal(raw):.2f}")
@@ -54,12 +61,15 @@ def _dates(text: str) -> set[str]:
         found.add(f"md:{month_number(mon)}-{int(day)}")
     for day, mon in re.findall(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?" + MONTH_ALT, text, re.I):
         found.add(f"md:{month_number(mon)}-{int(day)}")
+    for mon, year in re.findall(MONTH_ALT + r"\.?,?\s+(\d{4})\b", text, re.I):
+        found.add(f"my:{year}-{month_number(mon):02d}")
     return found
 
 
 def _date_keys(text: str) -> set[str]:
     keys = _dates(text)
-    return keys | {f"md:{int(k[5:7])}-{int(k[8:10])}" for k in keys if not k.startswith("md:")}
+    full = [k for k in keys if not k.startswith(("md:", "my:"))]
+    return keys | {f"md:{int(k[5:7])}-{int(k[8:10])}" for k in full} | {f"my:{k[:7]}" for k in full}
 
 
 class ResponseValidator:
@@ -70,6 +80,7 @@ class ResponseValidator:
                                  key=len, reverse=True)
         self._phrases = {c.case_id: [p for p in (c.denial_reason, c.summary) if p] for c in repo.claims}
         self._owner = {c.case_id: c.party_id for c in repo.claims}
+        self._names = {p.party_id: [n.lower() for n in (p.name, *p.name_aliases)] for p in repo.policyholders}
         self._pii = {p.party_id: {p.id_last4, p.phone[-4:], p.email.lower(), *(a.lower() for a in p.email_aliases)}
                      for p in repo.policyholders}
 
@@ -90,6 +101,9 @@ class ResponseValidator:
             if doc in remaining:
                 atoms.add(f"document:{doc}")
                 remaining = remaining.replace(doc, " ")
+        for party, names in self._names.items():
+            if any(re.search(rf"\b{re.escape(n)}\b", low) for n in names):
+                atoms.add(f"name:{party}")
         grams = _ngrams(low)
         for case_id, phrases in self._phrases.items():
             if any(len(grams & _ngrams(p)) >= 2 for p in phrases):
@@ -108,6 +122,8 @@ class ResponseValidator:
         kind, _, value = atom.partition(":")
         if kind in ("claim", "phrase"):
             return self._owner.get(value.replace("claim:", ""), party) != party
+        if kind == "name":
+            return value != party
         if kind in ("digits", "phone", "email"):
             return any(value in vals for pid, vals in self._pii.items() if pid != party)
         return False
@@ -118,14 +134,18 @@ class ResponseValidator:
         violations += [f"unknown_citation:{c}" for c in cited if c not in fact_ids]
         atoms = self._atoms(reply, strict=not ctx.verified)
         if not ctx.verified:
-            echo = {a for a in self._atoms(caller_text) if a.startswith("claim:")}
+            echo = {a for a in self._atoms(caller_text) if a.startswith(("claim:", "name:"))}
             violations += [f"pre_verification:{a}" for a in sorted(atoms - echo - self._allowed(ctx))]
             if VERIFIED_CLAIM.search(reply):
                 violations.append("claims_verified_while_unverified")
         else:
             party = ctx.caller_party_id
-            for atom in sorted(atoms - self._allowed(ctx)):
+            allowed = self._allowed(ctx) | {f"name:{party}"}
+            for atom in sorted(atoms - allowed):
                 violations.append(("other_party:" if self._other_party(atom, party) else "ungrounded:") + atom)
+        if any(f.label == "appeal_deadline_status" and f.value == "passed" for f in ctx.facts) \
+                and LIVE_DEADLINE_RE.search(reply):
+            violations.append("deadline_presented_as_live")
         for fact_id, pattern in ACTION_CLAIMS.items():
             if pattern.search(reply) and fact_id not in fact_ids:
                 violations.append(f"unbacked_action_claim:{fact_id}")

@@ -27,6 +27,7 @@ class RuleExtractor:
             intent=self._intent(text, dob_spans),
             speaker_role=self._speaker(text),
             stated_relationship=self._relationship(text),
+            stated_subject_relation=self._subject_relation(text),
             scope=self._scope(text),
             emotion=self._emotion(text),
             consent_signal=self._consent(text),
@@ -83,7 +84,8 @@ class RuleExtractor:
                     names.append(lead.group(1))
                     break
         bare = text.strip().strip(".!")
-        if not names and expected == "name" and re.fullmatch(r"[A-Za-z'-]+(?:\s+[A-Za-z'-]+){1,3}", bare):
+        if not names and expected == "name" and re.fullmatch(r"[A-Za-z'-]+(?:\s+[A-Za-z'-]+){1,3}", bare) \
+                and not any(w.lower() in lx.FILLER_WORDS for w in bare.split()):
             names.append(bare)
         return list(dict.fromkeys(names))
 
@@ -101,11 +103,12 @@ class RuleExtractor:
         """A third-party caller's own name is not a verification factor for the policyholder."""
         if self._speaker(text) != "third_party":
             return pii, None, None
-        own = [c for c in pii if c.field == "name" and not c.caller_refused]
+        subject = lx.SUBJECT_NAME_RE.search(text) or lx.SUBJECT_RE.search(text)
+        subject_name = subject.group(1) if subject else None
+        own = [c for c in pii if c.field == "name" and not c.caller_refused and c.raw_value != subject_name]
         speaker = own[0].raw_value if own else None
         rest = [c for c in pii if c.field != "name" or c.caller_refused]
-        subject = lx.SUBJECT_RE.search(text)
-        subject_name = subject.group(1) if subject and subject.group(1) != speaker else None
+        subject_name = subject_name if subject_name != speaker else None
         if subject_name:
             rest.append(PiiCandidate(field="name", raw_value=subject_name))
         return rest, speaker, subject_name
@@ -143,8 +146,12 @@ class RuleExtractor:
 
     @staticmethod
     def _relationship(text: str) -> str | None:
-        m = re.search(r"i'?m (?:her|his) (\w+)", text, re.I) or (
-            lx.RELATIONSHIP_RE.search(text) if lx.THIRD_PARTY_RE.search(text) else None)
+        m = lx.SELF_RELATION_RE.search(text)
+        return m.group(1).lower() if m else None
+
+    @staticmethod
+    def _subject_relation(text: str) -> str | None:
+        m = lx.SUBJECT_RELATION_RE.search(text) if lx.THIRD_PARTY_RE.search(text) else None
         return m.group(1).lower() if m else None
 
     @staticmethod

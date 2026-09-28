@@ -63,5 +63,7 @@ def answer(ctx: StepContext, state: ConversationState, claim_facts: tuple[Fact, 
     else:
         chosen = _guidance(ctx, state, claim_facts, deadline) or _by_label(claim_facts, "status")
     extra = tuple(f for f in chosen if f not in claim_facts)
-    return ctx.decide(state, A.ANSWER, facts=claim_facts + extra,
-                      details={"answer_ids": [f.fact_id for f in chosen], "offer_human": False})
+    details = {"answer_ids": [f.fact_id for f in chosen], "offer_human": False}
+    if any(f.label == "appeal_deadline_status" and f.value == "passed" for f in chosen):
+        details["implicit_offer"] = "deadline_review"
+    return ctx.decide(state, A.ANSWER, facts=claim_facts + extra, details=details)

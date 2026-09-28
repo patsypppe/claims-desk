@@ -28,6 +28,8 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
     if len(factors) >= MIN_FACTORS and key != state.last_verification_key:
         state = state.model_copy(update={"last_verification_key": key})
         result = ctx.call("request_representative_consent", state)
+        if result.ok and ctx.ctl.is_locked_out(result.data["party_id"]):
+            return verify.failed(ctx, state, result.data["party_id"])
         if result.ok:
             return _approved(ctx, state, result.data["party_id"])
         if result.data.get("status") in ("timeout", "denied"):
@@ -36,6 +38,9 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
     remaining = verify.askable(state)
     if len(factors) + len(remaining) < MIN_FACTORS:
         return ctx.escalate(state, "insufficient_verification_factors")
+    if not remaining:
+        return ctx.decide(state.model_copy(update={"expected_field": None}), A.VERIFY_FAILED,
+                          alternatives=tuple(f for f in verify.ASK_ORDER if f not in state.refused))
     state = state.model_copy(update={"expected_field": remaining[0] if remaining else None})
     details = {"captured": len(factors), "for_policyholder": True, "protected_request": False}
     return ctx.decide(state, A.ASK_FIELDS, alternatives=tuple(remaining), details=details)

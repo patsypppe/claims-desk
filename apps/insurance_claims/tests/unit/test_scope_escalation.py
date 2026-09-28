@@ -102,7 +102,7 @@ def test_declining_human_offer_continues(agent):
 
 
 def test_yes_without_pending_offer_does_not_escalate(agent):
-    *_, r = talk(agent, VERIFY, "yes")
+    *_, r = talk(agent, "Margaret Chen, born March 15 1985, SSN ends in 4472. It's about my auto claim.", "yes")
     assert not r.snapshot.escalated
 
 
