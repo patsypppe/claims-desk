@@ -82,8 +82,9 @@ def _merge_intent(rules: IntentHintsIn, llm: IntentHintsIn, text: str, turn: int
     from claims_agent.extraction.lexicon import TYPE_SUPPORT
 
     llm_type = llm.case_type if llm.case_type and TYPE_SUPPORT[llm.case_type].search(text) else None
+    llm_status = llm.status if llm.status in lx.STATUS_SUPPORT and lx.STATUS_SUPPORT[llm.status].search(text) else None
     return IntentHintsIn(
-        case_type=rules.case_type or llm_type, status=pick(rules.status, llm.status),
+        case_type=rules.case_type or llm_type, status=pick(rules.status, llm_status),
         month=rules.month or (llm.month if month_word else None),
         year=rules.year or (llm.year if llm.year and str(llm.year) in date_text else None),
         claim_id=claim_id, topic=pick(rules.topic, llm.topic), followup_topic=pick(rules.followup_topic, llm.followup_topic),

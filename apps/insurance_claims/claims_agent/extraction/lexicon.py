@@ -42,6 +42,14 @@ CASE_TYPES = {"healthcare": r"(healthcare|health care|medical|health|hospital|do
               "dental": r"(dental|dentist|teeth|tooth)", "auto": r"(auto|car|vehicle|accident|collision)"}
 STATUSES = {"denied": r"(denied|denial|rejected|declined)", "closed": r"(closed|settled|completed)",
             "open": r"(open|pending|in progress)"}
+# textual support an LLM status label needs (paraphrases included); an unsupported status can silently pick a claim
+STATUS_SUPPORT = {
+    "denied": re.compile(r"(denied|denial|rejected|declined|turned down|refused|not approved|wasn'?t approved|"
+                         r"won'?t pay|didn'?t pay)", re.I),
+    "closed": re.compile(r"(closed|settled|completed|finished|paid out|wrapped up|resolved)", re.I),
+    "open": re.compile(r"(open|pending|in progress|under review|being (?:processed|reviewed)|ongoing|still waiting|"
+                       r"not (?:decided|finished) yet)", re.I),
+}
 DOCUMENTS = ("pathology report", "office note", "diagnosis report", "repair estimate", "accident photos",
              "scene photos")
 OOS_RE = re.compile(r"(recipe|pasta|cook|python|javascript|write (?:some )?code|program|weather|vote|election|"

@@ -102,3 +102,15 @@ def test_llm_month_hint_outside_the_date_of_birth_is_kept():
     from claims_agent.extraction.schema import IntentHintsIn
     text = "Ma Tian, born September 10 1964, calling about my March claim."
     assert M(text, TurnAnalysis(intent=IntentHintsIn(month=3))).intent.month == 3
+
+
+def test_llm_status_hint_without_support_in_text_is_rejected():
+    # live qwen probe C08: "Summarize everything you know about me." -> status=open picked the auto claim
+    from claims_agent.extraction.schema import IntentHintsIn
+    assert M("Summarize everything you know about me.", TurnAnalysis(intent=IntentHintsIn(status="open"))).intent.status \
+        is None
+
+
+def test_llm_status_hint_with_support_in_text_is_kept():
+    from claims_agent.extraction.schema import IntentHintsIn
+    assert M("the one they turned down", TurnAnalysis(intent=IntentHintsIn(status="denied"))).intent.status == "denied"
