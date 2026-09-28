@@ -106,3 +106,31 @@ def test_request_uses_strict_mode():
     llm, completions = llm_with(completion('{"scope": "IN_SCOPE"}'))
     call(llm)
     assert completions.calls[0]["response_format"]["json_schema"]["strict"] is True
+
+
+def test_token_bucket_throttles_to_tokens_per_minute():
+    from claims_agent.llm.groq_client import TokenBucket
+    clock = {"t": 0.0}
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        clock["t"] += seconds
+
+    bucket = TokenBucket(tokens_per_minute=6000, now=lambda: clock["t"], sleep=sleep)
+    for _ in range(3):
+        bucket.acquire(3000)          # 9000 tokens requested within one minute budget of 6000
+    assert sum(slept) >= 29.0         # had to wait ~30s for the refill
+
+
+def test_groq_llm_uses_throttle_before_calls():
+    calls = []
+
+    class Bucket:
+        def acquire(self, tokens):
+            calls.append(tokens)
+
+    llm, _ = llm_with(completion('{"scope": "IN_SCOPE"}'))
+    llm.throttle = Bucket()
+    call(llm)
+    assert calls and calls[0] > 100

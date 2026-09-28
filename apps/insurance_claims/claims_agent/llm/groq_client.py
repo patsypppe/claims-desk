@@ -13,6 +13,36 @@ from claims_agent.llm.client import CircuitBreaker, T
 REASONING_PREFIXES = ("openai/gpt-oss",)
 
 
+class TokenBucket:
+    """Client-side pacing for per-model tokens-per-minute limits (e.g. Groq free tier: 8K TPM).
+
+    Waiting here is better than bursting into 429s: retries after a 429 can still fail and degrade the turn.
+    """
+
+    def __init__(self, tokens_per_minute: int, now=None, sleep=None) -> None:
+        import threading
+        import time
+
+        self._rate = tokens_per_minute / 60.0
+        self._capacity = float(tokens_per_minute)
+        self._tokens = float(tokens_per_minute)
+        self._now, self._sleep = now or time.monotonic, sleep or time.sleep
+        self._last = self._now()
+        self._lock = threading.Lock()
+
+    def acquire(self, tokens: int) -> None:
+        tokens = min(float(tokens), self._capacity)
+        with self._lock:
+            while True:
+                now = self._now()
+                self._tokens = min(self._capacity, self._tokens + (now - self._last) * self._rate)
+                self._last = now
+                if self._tokens >= tokens:
+                    self._tokens -= tokens
+                    return
+                self._sleep((tokens - self._tokens) / self._rate)
+
+
 def _close(node):
     if isinstance(node, dict):
         node = {k: _close(v) for k, v in node.items() if k not in ("default", "title")}
@@ -34,10 +64,11 @@ def strict_schema(schema) -> dict:
 
 
 class GroqLLM:
-    def __init__(self, client, model: str, breaker: CircuitBreaker | None = None) -> None:
+    def __init__(self, client, model: str, breaker: CircuitBreaker | None = None, throttle=None) -> None:
         self._client, self._model = client, model
         self.breaker = breaker or CircuitBreaker()
         self.last_error: str | None = None
+        self.throttle = throttle
 
     def _kwargs(self, system: str, user: str, schema, effort: str, max_tokens: int, mode: str) -> dict:
         if mode == "json_schema":
@@ -71,6 +102,8 @@ class GroqLLM:
         if not self.breaker.allow():
             self.last_error = "circuit_open"
             return None
+        if self.throttle is not None:  # rough estimate: 4 chars/token for prompt + schema, plus the output budget
+            self.throttle.acquire((len(system) + len(user) + 2000) // 4 + max(max_tokens, 1024))
         try:
             response = self._complete(system, user, schema, effort, max(max_tokens, 1024))
         except (groq.APIError, groq.GroqError) as exc:

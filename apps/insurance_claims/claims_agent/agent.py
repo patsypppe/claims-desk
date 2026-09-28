@@ -236,6 +236,19 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
     return agent
 
 
+_BUCKETS: dict = {}
+
+
+def _bucket(model: str):
+    """One pacing bucket per model per process (limits are per model); GROQ_TPM=0 disables pacing."""
+    from claims_agent.llm.groq_client import TokenBucket
+
+    tpm = int(os.environ.get("GROQ_TPM", "8000"))
+    if tpm <= 0:
+        return None
+    return _BUCKETS.setdefault(model, TokenBucket(tpm))
+
+
 def llm_clients(settings: Settings):
     """(extraction_llm, responder_llm). Rules mode has no model at all."""
     if settings.agent_mode == "rules":
@@ -247,7 +260,8 @@ def llm_clients(settings: Settings):
 
         retries = int(os.environ.get("LLM_MAX_RETRIES", "3"))
         client = groq.Groq(api_key=settings.api_key.get_secret_value(), timeout=60.0, max_retries=retries)
-        return GroqLLM(client, settings.extraction_model), GroqLLM(client, settings.model)
+        return (GroqLLM(client, settings.extraction_model, throttle=_bucket(settings.extraction_model)),
+                GroqLLM(client, settings.model, throttle=_bucket(settings.model)))
     import anthropic
 
     from claims_agent.llm.client import AnthropicLLM
