@@ -27,6 +27,10 @@ SECURITY_HEADERS = {
 }
 
 
+class SessionIn(BaseModel):
+    channel_token: str | None = Field(default=None, max_length=1024)
+
+
 class ChatIn(BaseModel):
     text: str = Field(min_length=1, max_length=MAX_INPUT_CHARS)
     sensitive: bool = False  # "secure field": this turn is processed on-server only (never sent to an LLM)
@@ -66,8 +70,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "ok", "mode": settings.agent_mode}
 
     @app.post("/api/session")
-    def new_session(response: Response) -> dict:
-        _set_cookie(response, agent.new_session())
+    def new_session(response: Response, body: SessionIn | None = None) -> dict:
+        _set_cookie(response, agent.new_session(channel_token=body.channel_token if body else None))
         return {"ok": True, "mode": settings.agent_mode, "debug_panel": settings.debug_panel}
 
     @app.post("/api/reset")

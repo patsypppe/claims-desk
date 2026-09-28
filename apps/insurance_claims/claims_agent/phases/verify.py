@@ -77,7 +77,18 @@ def _otp_policy_applies(ctx: StepContext, state: ConversationState, refused_now:
     return False
 
 
+def _channel(ctx: StepContext, state: ConversationState) -> Decision | None:
+    token, state_cleared = state.channel_token, state.model_copy(update={"channel_token": None})
+    result = ctx.call("accept_channel_assertion", state, token=token)
+    return _verified(ctx, state_cleared, result.data["party_id"], method="channel") if result.ok else None
+
+
 def handle(ctx: StepContext, state: ConversationState) -> Decision:
+    if state.channel_token:
+        decision = _channel(ctx, state)
+        if decision is not None:
+            return decision
+        state = state.model_copy(update={"channel_token": None})
     if state.otp_pending:
         return _otp_turn(ctx, state)
     if state.speaker.role == "third_party":

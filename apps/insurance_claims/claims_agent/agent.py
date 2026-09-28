@@ -45,8 +45,8 @@ class Agent:
         self.extraction_llm, self.responder, self.sessions, self.validator = extraction_llm, responder, sessions, validator
         self.use_llm = not isinstance(extraction_llm, NullLLM)
 
-    def new_session(self) -> str:
-        return self.sessions.create()
+    def new_session(self, channel_token: str | None = None) -> str:
+        return self.sessions.create(channel_token=channel_token)
 
     def _llm_analysis(self, state, text: str, events: list) -> TurnAnalysis | None:
         """Only redacted text reaches the provider; placeholders are restored deterministically."""
@@ -133,6 +133,7 @@ class Agent:
 
 def _registry(repo, clock, settings, email_fails=False, consent_scenario="default", no_guard=False,
               otp_codes=None) -> ToolRegistry:
+    from claims_agent.channel_auth import ChannelVerifier
     from claims_agent.tools.otp import MockOtpService
 
     sequence = repo.consent_scenarios.get(consent_scenario, repo.consent_scenarios["default"])
@@ -141,6 +142,8 @@ def _registry(repo, clock, settings, email_fails=False, consent_scenario="defaul
                         email_sender=MockEmailSender(fail=email_fails), handoff=MockHandoff(),
                         consent_service=MockConsentService(sequence),
                         otp=MockOtpService(codes=otp_codes, reveal_in_log=settings.mock_otp_reveal),
+                        channel=ChannelVerifier(settings.channel_signing_key.get_secret_value())
+                        if settings.channel_signing_key else None,
                         enforce_permissions=not no_guard)
 
 
@@ -157,9 +160,12 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
                          email_fails: bool = False, scripted_analyses: list | None = None,
                          no_validator: bool = False, no_guard: bool = False, responder_llm=None,
                          leaky_responder: bool = False, guard=None, verification_policy: str = "any3_or_otp",
-                         otp_codes=None) -> Agent:
+                         otp_codes=None, channel_key: str | None = None) -> Agent:
+    from pydantic import SecretStr
+
     settings = Settings(agent_mode="rules" if mode == "rules" else "llm", app_today=today,
-                        consent_scenario=consent_scenario, verification_policy=verification_policy)
+                        consent_scenario=consent_scenario, verification_policy=verification_policy,
+                        channel_signing_key=SecretStr(channel_key) if channel_key else None)
     clock = FixedClock(today)
     responder: Responder = TemplateResponder()
     if mode == "fake":

@@ -2,6 +2,7 @@
 # NOT generated from claims_agent.tools.registry. Tests compare the two.
 verify_identity: [VERIFY_ID]
 send_otp: [VERIFY_ID]
+accept_channel_assertion: [VERIFY_ID]
 verify_otp: [VERIFY_ID]
 request_representative_consent: [VERIFY_ID]
 search_claims: [RESOLVE_INTENT, PROCESS_CASE]

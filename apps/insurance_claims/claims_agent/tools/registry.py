@@ -16,6 +16,7 @@ P = Phase
 PERMISSIONS: dict[str, frozenset[Phase]] = {
     "verify_identity": frozenset({P.VERIFY_ID}),
     "send_otp": frozenset({P.VERIFY_ID}),
+    "accept_channel_assertion": frozenset({P.VERIFY_ID}),
     "verify_otp": frozenset({P.VERIFY_ID}),
     "request_representative_consent": frozenset({P.VERIFY_ID}),
     "search_claims": frozenset({P.RESOLVE_INTENT, P.PROCESS_CASE}),
@@ -92,6 +93,7 @@ class ToolRegistry:
     handoff: Any
     consent_service: Any
     otp: Any = None
+    channel: Any = None
     enforce_permissions: bool = True
     specs: dict[str, ToolSpec] = field(default_factory=dict)
 

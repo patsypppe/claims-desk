@@ -39,9 +39,9 @@ class SessionStore:
     now: Callable[[], float] = time.monotonic
     _states: dict[str, tuple[ConversationState, float]] = field(default_factory=dict)
 
-    def create(self) -> str:
+    def create(self, channel_token: str | None = None) -> str:
         sid = uuid.uuid4().hex
-        self._states[sid] = (ConversationState(session_id=sid), self.now())
+        self._states[sid] = (ConversationState(session_id=sid, channel_token=channel_token), self.now())
         return sid
 
     def get(self, sid: str) -> ConversationState:

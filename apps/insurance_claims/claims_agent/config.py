@@ -99,6 +99,7 @@ class Settings:
     guard_enabled: bool = True
     presidio_scan: bool = False
     verification_policy: str = "any3_or_otp"
+    channel_signing_key: SecretStr | None = field(default=None, repr=False)
     mock_otp_reveal: bool = False
     prompt_guard_model: str = "meta-llama/llama-prompt-guard-2-86m"
     safeguard_model: str = "openai/gpt-oss-safeguard-20b"
@@ -146,6 +147,8 @@ class Settings:
             presidio_scan=_bool_env("PRESIDIO_SCAN", True),
             verification_policy=_policy_env(),
             mock_otp_reveal=_bool_env("MOCK_OTP_REVEAL", False),
+            channel_signing_key=SecretStr(os.environ["CHANNEL_SIGNING_KEY"])
+            if os.environ.get("CHANNEL_SIGNING_KEY") else None,
             prompt_guard_model=os.environ.get("PROMPT_GUARD_MODEL") or "meta-llama/llama-prompt-guard-2-86m",
             safeguard_model=os.environ.get("SAFEGUARD_MODEL") or "openai/gpt-oss-safeguard-20b",
         )

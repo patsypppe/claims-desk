@@ -125,10 +125,17 @@ def verify_otp(reg, state: ConversationState, code: str = "") -> ToolResult:
     return ToolResult(ok=status == "ok", data={"status": status, "party_id": party})
 
 
+def accept_channel_assertion(reg, state: ConversationState, token: str = "") -> ToolResult:
+    party = reg.channel.verify(token) if reg.channel and token else None
+    valid = party is not None and reg.repo.policyholder(party) is not None
+    return ToolResult(ok=valid, data={"party_id": party if valid else None})
+
+
 def default_specs() -> list[ToolSpec]:
     return [
         ToolSpec("verify_identity", verify_identity),
         ToolSpec("send_otp", send_otp, require_unverified),
+        ToolSpec("accept_channel_assertion", accept_channel_assertion, require_unverified),
         ToolSpec("verify_otp", verify_otp, require_unverified),
         ToolSpec("request_representative_consent", request_representative_consent, require_third_party),
         ToolSpec("search_claims", search_claims, require_verified),
