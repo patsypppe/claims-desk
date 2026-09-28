@@ -128,7 +128,8 @@ class Agent:
         """Re-send the previous (already validated, same authorization) reply; state does not advance."""
         self.sessions.save(state)
         events.append(AuditEvent(kind="repair", detail={"pattern": "repeat"}, turn=state.turn))
-        return TurnResult(reply=f"Of course. {state.last_reply}", snapshot=snapshot(state), events=tuple(events))
+        return TurnResult(reply=f"Of course. {state.last_reply}", snapshot=snapshot(state), events=tuple(events),
+                          authorized_values=state.last_authorized_values)
 
     def _handle(self, session_id: str, text: str, sensitive: bool) -> TurnResult:
         state = self.sessions.get(session_id)
@@ -144,7 +145,7 @@ class Agent:
         reply, cited, respond_events = self._respond(ctx, text, state.turn)
         final = decision.state.model_copy(update={
             "disclosed_fact_ids": tuple(dict.fromkeys(decision.state.disclosed_fact_ids + tuple(cited))),
-            "last_reply": reply})
+            "last_reply": reply, "last_authorized_values": authorized_values(ctx)})
         self.sessions.save(final)
         all_events = tuple(events) + decision.events + tuple(respond_events)
         return TurnResult(reply=reply, snapshot=snapshot(final), events=all_events,

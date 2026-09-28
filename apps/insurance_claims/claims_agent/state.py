@@ -99,6 +99,7 @@ class ConversationState(FrozenModel):
     expected_field: PiiField | Literal["otp"] | None = None
     otp_pending: bool = False
     last_reply: str | None = None
+    last_authorized_values: tuple[str, ...] = ()
     channel_token: str | None = None  # untrusted until accept_channel_assertion verifies it; never in snapshots
     awaiting_anything_else: bool = False
     last_verification_key: str | None = None
