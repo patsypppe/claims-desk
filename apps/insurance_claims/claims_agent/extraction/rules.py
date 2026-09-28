@@ -104,7 +104,9 @@ class RuleExtractor:
         low = text.lower()
         docs = [d for d in lx.DOCUMENTS if d in low]
         unavailable = bool(docs) and bool(re.search(r"(don'?t have|can'?t get|cannot get|lost|unable to get|"
-                                                    r"no longer have|won'?t (?:give|send))", low))
+                                                    r"no longer have|won'?t (?:give|send|reissue)|can'?t reissue|"
+                                                    r"cannot reissue|no copy|can'?t find|cannot find|"
+                                                    r"(?:isn'?t|not|no longer) available|unavailable)", low))
         return IntentHintsIn(
             case_type=next((k for k, p in lx.CASE_TYPES.items() if re.search(p, low)), None),
             status=next((k for k, p in lx.STATUSES.items() if re.search(p, low)), None),

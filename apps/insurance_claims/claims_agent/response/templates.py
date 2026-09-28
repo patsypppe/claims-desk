@@ -125,6 +125,15 @@ def _escalate(ctx: ResponseContext) -> str:
     return f"{lead} Your reference is {ref}." if ref else lead
 
 
+def _resume(ctx: ResponseContext) -> str:
+    field = ctx.details.get("resume_field")
+    text = (f" To continue, could you share {FIELD_LABELS[field]}?" if field and not ctx.verified
+            else " If you'd like, we can continue with your claim.")
+    if ctx.details.get("offer_human"):
+        text += " If there's something else you need, I can also connect you with a member of our team."
+    return text
+
+
 def _options(ctx: ResponseContext) -> str:
     return "; ".join(f"{i}. the {o}" for i, o in enumerate(ctx.options, start=1))
 
@@ -158,9 +167,9 @@ RENDERERS = {
                                  "Would you like me to try again?"),
     A.EMAIL_SKIPPED: lambda ctx: "No problem, I won't send an email. Thanks for calling, and take care!",
     A.REDIRECT_SCOPE: lambda ctx: ("I can help with your insurance policy or claim, but I can't assist with that "
-                                   "topic. If you'd like, we can continue with your claim."),
-    A.REFUSE_UNSAFE: lambda ctx: ("I can't help with that request. I'm here to help with your insurance policy "
-                                  "or claim, and I'm happy to continue with that."),
+                                   "topic." + _resume(ctx)),
+    A.REFUSE_UNSAFE: lambda ctx: "I can't help with that request. I'm here to help with your insurance policy or claim."
+                                 + _resume(ctx),
     A.ESCALATE: _escalate,
     A.ESCALATED_HOLD: lambda ctx: ("A member of our team will pick this up from here, so I'm not able to continue "
                                    "on this line. Thank you for your patience."),

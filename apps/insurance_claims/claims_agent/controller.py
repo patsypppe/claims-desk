@@ -74,6 +74,10 @@ class StepContext:
         return state.model_copy(update={"phase": to})
 
     def decide(self, state: ConversationState, action: ControllerAction, **kw) -> Decision:
+        details = kw.get("details") or {}
+        offers_human = details.get("offer_human") or self.emotion.offer_human
+        if offers_human and state.phase not in (Phase.ESCALATED, Phase.COMPLETE, Phase.POST_PROCESS):
+            state = state.model_copy(update={"pending_human_offer": details.get("offer_reason", "caller_request")})
         return Decision(state=state, action=action, emotion=self.emotion, events=tuple(self.events), **kw)
 
     def escalate(self, state: ConversationState, reason: str) -> Decision:

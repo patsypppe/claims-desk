@@ -4,6 +4,7 @@ from claims_agent.controller import ControllerAction as A
 from claims_agent.controller import Decision, StepContext
 from claims_agent.phases import post, process, resolve, verify
 from claims_agent.policy.emotion import strategy_for
+from claims_agent.policy.scope import decide_scope
 from claims_agent.state import ConversationState, Phase
 
 HANDLERS = {
@@ -31,6 +32,24 @@ def run(ctx: StepContext, state: ConversationState) -> Decision:
     if state.phase == Phase.COMPLETE:
         return ctx.decide(state, A.CLOSE)
     _guard_tool_requests(ctx, state)
+    offer, state = state.pending_human_offer, state.model_copy(update={"pending_human_offer": None})
     if analysis.requested_action == "request_human":
         return ctx.escalate(state, "caller_request")
-    return HANDLERS[state.phase](ctx, state)
+    if offer and analysis.consent_signal == "YES" and analysis.requested_action != "ask_question":
+        return ctx.escalate(state, offer)
+    scoped = _scope(ctx, state)
+    return scoped if scoped is not None else HANDLERS[state.phase](ctx, state)
+
+
+def _scope(ctx: StepContext, state: ConversationState) -> Decision | None:
+    settings = ctx.ctl.settings
+    decision = decide_scope(ctx.analysis, ctx.text, state, settings.oos_offer_threshold,
+                            settings.oos_escalation_threshold)
+    if decision is None:
+        return None
+    state = state.model_copy(update={"counters": state.counters.model_copy(update={"out_of_scope": decision.count})})
+    if decision.kind == "escalate":
+        return ctx.escalate(state, "repeated_out_of_scope")
+    action = A.REFUSE_UNSAFE if decision.kind == "refuse_unsafe" else A.REDIRECT_SCOPE
+    details = {"count": decision.count, "offer_human": decision.offer_human, "resume_field": state.expected_field}
+    return ctx.decide(state, action, details=details)

@@ -39,3 +39,19 @@ One block per iteration: what changed, what ran, results, failures by category, 
   - The email "action claim" pattern was too broad and matched "I've sent an authorization request". Narrowed.
 - **Ablation note:** `--no-validator` shows the same numbers in rules mode because the templates never leak. The validator's value shows against a misbehaving LLM (the leaky-responder test). Task 16 adds that to the CLI.
 - **Next:** scope, refusal recovery and escalation (Task 13).
+
+## Iteration 4: scope, recovery, escalation (Task 13)
+
+- **Changes:**
+  - Stateful scope policy: redirect on the 1st off-topic turn, redirect plus a human offer on the 2nd, escalate on the 3rd. The counter is not reset by in-scope turns. Off-topic turns that carry PII are processed normally.
+  - Unsafe requests (system prompt, developer mode, others' data) are refused and counted.
+  - Redirects return to the next required action.
+  - A pending human offer plus a "yes" escalates with the offer's reason.
+  - Claim-tool failure escalates instead of guessing.
+- **New scenarios:** s2 (repeated off-topic → escalation), s3 (off-topic mid-verification keeps factors and intent), x2 (document alternatives exhausted → human).
+- **Tests:** 372 passed, 1 skipped.
+- **Eval (rules, 13 scenarios):** 12/13. Gate 22/22, leakage 0/35, bypass 0/13, unauthorized tools 0/27, email without consent 0/1.
+- **Failures found and fixed:**
+  - *extraction:* "can't reissue … no copy" wasn't recognized as a document being unavailable, so x2 never reached the human offer. The cue list is widened, with tests.
+  - *validator false positive:* the pre-verification escalation ticket "HND-0001" tripped the 4-digit rule. Now fixed: the validator subtracts the atoms of facts allowlisted for the turn.
+- **Remaining failure:** m1 (post-process send), which is Task 15.

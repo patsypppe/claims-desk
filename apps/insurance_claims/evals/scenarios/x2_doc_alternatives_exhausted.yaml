@@ -1,0 +1,15 @@
+id: x2_doc_alternatives_exhausted
+category: escalation
+tags: [grounding]
+description: Guideline alternatives first; if still unavailable, offer a human claims representative (per guideline).
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", id_last4: "4472"}
+expected_outcome: {escalated: true, escalation_reason: document_alternatives_exhausted, case_id: CL-2048}
+turns:
+  - user: "Margaret Chen, born March 15 1985, SSN ends in 4472. It's about my denied healthcare claim."
+    expect: {state: {selected_case_id: CL-2048}}
+  - user: "I can't get the pathology report from the lab."
+    expect: {tools_called: [get_document_guidance], text: {must_reference: ["replacement copy"], no_ungrounded_atoms: true}}
+  - user: "The lab says they can't reissue the pathology report and I have no copy."
+    expect: {text: {must_reference: ["claims representative"]}, state: {escalated: false}}
+  - user: "Yes please."
+    expect: {state: {escalated: true}, tools_called: [escalate_to_human]}

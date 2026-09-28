@@ -24,7 +24,8 @@ def _doc_unavailable(ctx: StepContext, state: ConversationState, claim_facts) ->
                           unavailable=True)
     facts = claim_facts + result.facts
     return ctx.decide(state, A.ANSWER, facts=facts,
-                      details={"answer_ids": [f.fact_id for f in result.facts], "offer_human": exhausted})
+                      details={"answer_ids": [f.fact_id for f in result.facts], "offer_human": exhausted,
+                               "offer_reason": "document_alternatives_exhausted"})
 
 
 def _guidance(ctx: StepContext, state: ConversationState, claim_facts, deadline: list[Fact]) -> list[Fact]:

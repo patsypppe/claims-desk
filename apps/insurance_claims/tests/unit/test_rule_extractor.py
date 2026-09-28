@@ -156,3 +156,9 @@ def test_leading_name_without_cue(rx, text):
 
 def test_leading_capitalized_phrase_not_name(rx):
     assert "name" not in fields(rx.analyze("Healthcare Claim, what's the status?", None))
+
+
+@pytest.mark.parametrize("text", ["The lab can't reissue the pathology report and I have no copy.",
+                                  "The office note isn't available anymore", "I can't find the office note"])
+def test_document_unavailable_variants(rx, text):
+    assert rx.analyze(text, None).intent.document_unavailable

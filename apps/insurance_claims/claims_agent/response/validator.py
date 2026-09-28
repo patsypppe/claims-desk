@@ -119,7 +119,7 @@ class ResponseValidator:
         atoms = self._atoms(reply, strict=not ctx.verified)
         if not ctx.verified:
             echo = {a for a in self._atoms(caller_text) if a.startswith("claim:")}
-            violations += [f"pre_verification:{a}" for a in sorted(atoms - echo)]
+            violations += [f"pre_verification:{a}" for a in sorted(atoms - echo - self._allowed(ctx))]
             if VERIFIED_CLAIM.search(reply):
                 violations.append("claims_verified_while_unverified")
         else:

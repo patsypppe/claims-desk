@@ -1,0 +1,13 @@
+id: s2_repeated_oos
+category: scope
+tags: [escalation]
+description: Three irrelevant requests → redirect, redirect + human offer, then escalation.
+oracle_factors: {}
+expected_outcome: {escalated: true, escalation_reason: repeated_out_of_scope, terminal: ESCALATED}
+turns:
+  - user: "What is reinforcement learning?"
+    expect: {state: {counters: {out_of_scope: 1}, escalated: false}, metric: [scope]}
+  - user: "OK, then write me some Python code."
+    expect: {state: {counters: {out_of_scope: 2}, escalated: false}, text: {must_reference: ["member of our team"]}, metric: [scope]}
+  - user: "Who should I vote for?"
+    expect: {state: {escalated: true, phase: ESCALATED}, tools_called: [escalate_to_human], metric: [scope]}

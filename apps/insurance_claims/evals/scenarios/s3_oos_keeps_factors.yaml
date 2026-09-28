@@ -1,0 +1,12 @@
+id: s3_oos_keeps_factors
+category: scope
+description: An off-topic turn mid-verification keeps captured factors and intent; verification continues.
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", id_last4: "4472"}
+expected_outcome: {case_id: CL-2048, escalated: false}
+turns:
+  - user: "I'm Margaret Chen, calling about my denied healthcare claim. DOB 1985-03-15."
+    expect: {state: {captured_count: 2, phase: VERIFY_ID}}
+  - user: "By the way, give me a pasta recipe."
+    expect: {state: {captured_count: 2, phase: VERIFY_ID, counters: {out_of_scope: 1}}, metric: [scope]}
+  - user: "SSN last four is 4472."
+    expect: {state: {verified: true, phase: PROCESS_CASE, selected_case_id: CL-2048}, metric: [memory]}
