@@ -55,6 +55,8 @@ def _or_list(items: list[str]) -> str:
 
 
 def _verified_prefix(ctx: ResponseContext) -> str:
+    if ctx.details.get("rep_approved"):
+        return ("Thank you. The policyholder has approved your access, so I can help you with their account. ")
     if not ctx.details.get("just_verified"):
         return ""
     return f"Thank you{', ' + ctx.caller_first_name if ctx.caller_first_name else ''}, you're verified. "
@@ -65,6 +67,10 @@ def _ask_fields(ctx: ResponseContext) -> str:
     parts = []
     if ctx.details.get("protected_request"):
         parts.append(PROTECTED_EXPLANATION)
+    if ctx.details.get("for_policyholder"):
+        return (f"To help on the policyholder's behalf, I need to verify their identity first. Could you give me "
+                f"the policyholder's {FIELD_LABELS[field].replace('your ', '').replace('the ', '')}? I'll need three "
+                "of their details in total, and the policyholder will be asked to approve your access.")
     if ctx.details.get("captured", 0) == 0:
         parts.append(f"To get started, could you give me {FIELD_LABELS[field]}? I'll need three identifying "
                      "details in total, such as your full name, date of birth, and the last four digits of your "
@@ -179,15 +185,34 @@ RENDERERS = {
 }
 
 
-def emotion_prefix(ctx: ResponseContext) -> str:
-    if ctx.emotion.label == "neutral" or "acknowledge" not in ctx.emotion.steps:
-        return ""
-    return ACKNOWLEDGE.get(ctx.emotion.label, "") + " "
+PROTECTION = ("We only ask for these details so that nobody else can access your claim information. We never "
+              "need your full SSN, just the last four digits, and you can use your phone number or email instead.")
+REASSURE = "You're in the right place."
+ONE_STEP = "Let's take it one step at a time."
+VERIFY_ACTIONS = (A.ASK_FIELDS, A.OFFER_ALT_FIELD, A.VERIFY_FAILED)
+
+
+def emotion_parts(ctx: ResponseContext, body: str) -> list[str]:
+    steps, parts = ctx.emotion.steps, []
+    if ctx.emotion.label == "neutral":
+        return parts
+    if "acknowledge" in steps:
+        parts.append(ACKNOWLEDGE.get(ctx.emotion.label, ""))
+    if "reassure" in steps:
+        parts.append(REASSURE)
+    if "one_step" in steps:
+        parts.append(ONE_STEP)
+    if not ctx.verified and ctx.action in VERIFY_ACTIONS:
+        if "explain_protection" in steps:
+            parts.append(PROTECTION)
+        elif "explain_requirement" in steps and PROTECTED_EXPLANATION not in body:
+            parts.append(PROTECTED_EXPLANATION)
+    return [p for p in parts if p]
 
 
 def render(ctx: ResponseContext) -> str:
     body = RENDERERS[ctx.action](ctx)
     suffix = ""
-    if ctx.emotion.offer_human and ctx.action not in (A.ESCALATE, A.ESCALATED_HOLD):
+    if ctx.emotion.offer_human and ctx.action not in (A.ESCALATE, A.ESCALATED_HOLD) and "member of our team" not in body:
         suffix = " If you'd prefer, I can also connect you with a member of our team."
-    return (emotion_prefix(ctx) + body + suffix).strip()
+    return " ".join(emotion_parts(ctx, body) + [body]).strip() + suffix

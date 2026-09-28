@@ -110,7 +110,9 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
         speaker_role="third_party" if "third_party" in (rules.speaker_role, llm.speaker_role)
         else (llm.speaker_role if llm.speaker_role != "unknown" else rules.speaker_role),
         stated_relationship=relationship,
-        stated_subject_name=llm.stated_subject_name if _in_text(llm.stated_subject_name, text) else None,
+        stated_subject_name=rules.stated_subject_name or (
+            llm.stated_subject_name if _in_text(llm.stated_subject_name, text) else None),
+        speaker_name=rules.speaker_name or (llm.speaker_name if _in_text(llm.speaker_name, text) else None),
         scope=llm.scope, emotion=llm.emotion,
         consent_signal=_merge_consent(rules.consent_signal, llm.consent_signal),
         requested_action=_merge_action(rules.requested_action, llm.requested_action),
@@ -184,6 +186,7 @@ def apply_analysis(state: ConversationState, analysis: TurnAnalysis, *, turn: in
     if analysis.speaker_role == "third_party" or state.speaker.role == "third_party":
         updates["speaker"] = state.speaker.model_copy(update={
             "role": "third_party",
+            "rep_name": state.speaker.rep_name or analysis.speaker_name,
             "relationship": state.speaker.relationship or analysis.stated_relationship})
     elif analysis.speaker_role == "self" and state.speaker.role == "unknown":
         updates["speaker"] = state.speaker.model_copy(update={"role": "self"})

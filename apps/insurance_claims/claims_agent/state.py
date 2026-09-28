@@ -56,6 +56,7 @@ class Counters(FrozenModel):
     doc_alternatives_given: int = 0
     consent_clarifications: int = 0
     email_failures: int = 0
+    heated_turns: int = 0
 
 
 class Verification(FrozenModel):

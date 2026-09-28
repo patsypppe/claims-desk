@@ -90,3 +90,5 @@ ATTRIBUTE_RULES = (
     ("documents", r"(what (?:do i need|documents)|which documents|what to send|need to send)"),
     ("status", r"(status)"),
 )
+SUBJECT_RE = re.compile(r"(?i:on behalf of|calling for|calling about|for)\s+(?i:my\s+\w+[,]?\s+)?"
+                        r"([A-Z][a-zA-Z'-]+\s+[A-Z][a-zA-Z'-]+)")

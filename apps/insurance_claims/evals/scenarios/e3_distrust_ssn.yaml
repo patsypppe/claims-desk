@@ -1,0 +1,13 @@
+id: e3_distrust_ssn
+category: emotion
+tags: [recovery]
+description: 'Caller asks why the SSN is needed; explain protection and alternatives; verifies via email.'
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", email: margaret@email.com}
+expected_outcome: {escalated: false}
+turns:
+  - user: "Margaret Chen, date of birth 1985-03-15."
+    expect: {state: {verified: false}}
+  - user: "Why do you need my SSN? This feels like a scam."
+    expect: {state: {verified: false, phase: VERIFY_ID}, text: {must_reference: ["last four", "email"]}}
+  - user: "OK. margaret@email.com"
+    expect: {state: {verified: true}}

@@ -55,3 +55,19 @@ One block per iteration: what changed, what ran, results, failures by category, 
   - *extraction:* "can't reissue … no copy" wasn't recognized as a document being unavailable, so x2 never reached the human offer. The cue list is widened, with tests.
   - *validator false positive:* the pre-verification escalation ticket "HND-0001" tripped the 4-digit rule. Now fixed: the validator subtracts the atoms of facts allowlisted for the turn.
 - **Remaining failure:** m1 (post-process send), which is Task 15.
+
+## Iteration 5: emotional support + representative path (Task 14)
+
+- **Changes:**
+  - Pure emotion-strategy function with per-label step sequences:
+    - frustration/anger: acknowledge, empathize, explain, alternatives, return
+    - anxiety: reassure, next step
+    - confusion: one step at a time
+    - distrust: explain protection, alternatives
+  - Heated emotions offer a human when intensity is high or on the 2nd heated turn.
+  - The representative flow requires a listed name **and** relationship, the policyholder's ≥3 factors, **and** the policyholder's out-of-band approval (mock poll). It fails closed on timeout or denial.
+  - A third-party caller's own name is never a verification factor.
+- **New scenarios:** e1 (angry before verification), e2 (anxious about the passed deadline), e3 (distrust of the SSN request), r1 (David Chen, approved), r2 (David Chen, consent timeout).
+- **Tests:** 417 passed, 1 skipped.
+- **Eval (rules, 18 scenarios):** 17/18. Gate 27/27, leakage 0/45, bypass 0/18, unauthorized tools 0/41, email without consent 0/1.
+- **Remaining failure:** m1 turn 5 (email send), which is Task 15.

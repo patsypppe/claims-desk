@@ -10,12 +10,13 @@ def turn_hints(ctx: StepContext) -> IntentHints:
     return IntentHints(case_type=i.case_type, status=i.status, month=i.month, year=i.year, claim_id=i.claim_id)
 
 
-def select(ctx: StepContext, state: ConversationState, case_id: str, unmatched: tuple[str, ...] = ()) -> Decision:
+def select(ctx: StepContext, state: ConversationState, case_id: str, unmatched: tuple[str, ...] = (),
+           details: dict | None = None) -> Decision:
     from claims_agent.phases import process
 
     state = state.model_copy(update={"selected_case_id": case_id, "candidate_case_ids": ()})
     state = ctx.transition(state, Phase.PROCESS_CASE, "case_selected")
-    return process.present(ctx, state, unmatched)
+    return process.present(ctx, state, unmatched, details or {})
 
 
 def _clarify(ctx: StepContext, state: ConversationState, options) -> Decision:
@@ -27,14 +28,15 @@ def _clarify(ctx: StepContext, state: ConversationState, options) -> Decision:
                       facts=ctx.option_facts)
 
 
-def handle(ctx: StepContext, state: ConversationState, just_verified: bool = False) -> Decision:
+def handle(ctx: StepContext, state: ConversationState, just_verified: bool = False,
+           representative: bool = False) -> Decision:
     result = ctx.call("search_claims", state)
     if not result.ok:
         return ctx.escalate(state, "tool_failure")
     case_ids = set(result.data["case_ids"])
     claims = tuple(c for c in ctx.ctl.repo.claims_for(state.verification.party_id) if c.case_id in case_ids)
     ctx.option_facts = result.facts
-    details = {"just_verified": just_verified}
+    details = {"just_verified": just_verified, "rep_approved": representative}
     if state.candidate_case_ids and not just_verified:
         options = tuple(option_for(c) for c in claims if c.case_id in state.candidate_case_ids)
         picked = pick_option(options, turn_hints(ctx), ctx.text)
@@ -45,7 +47,7 @@ def handle(ctx: StepContext, state: ConversationState, just_verified: bool = Fal
         return post.enter(ctx, state)
     res = resolve(claims, state.intent)
     if res.action == "PRESENT_CASE":
-        return select(ctx, state, res.case_id, res.unmatched)
+        return select(ctx, state, res.case_id, res.unmatched, details)
     if res.action == "DISAMBIGUATE_CASE":
         state = state.model_copy(update={"candidate_case_ids": res.candidates})
         return ctx.decide(state, A.DISAMBIGUATE_CASE, options=res.options, details=details, facts=result.facts)

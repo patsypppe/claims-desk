@@ -1,0 +1,10 @@
+id: r2_representative_timeout
+category: verification
+tags: [representative, escalation]
+consent_scenario: timeout
+description: Policyholder never approves → fail closed, no claim data, escalation.
+oracle_factors: {}
+expected_outcome: {escalated: true, escalation_reason: representative_consent_timeout}
+turns:
+  - user: "I'm David Chen, calling for my mother Margaret Chen, I'm her son. Her date of birth is 1985-03-15 and her SSN last four is 4472."
+    expect: {state: {verified: false, escalated: true}, tools_not_called: [search_claims]}

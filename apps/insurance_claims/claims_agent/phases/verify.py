@@ -18,7 +18,7 @@ def protected_request(ctx: StepContext) -> bool:
     return bool(intent.topic != "none" or intent.asked_attribute != "none" or intent.claim_id or intent.status)
 
 
-def _factor_key(state: ConversationState) -> str:
+def factor_key(state: ConversationState) -> str:
     items = sorted(state.current_values().items())
     return "|".join(f"{k}={v}" for k, v in items) + f"|policy={state.lookup.policy_number}"
 
@@ -30,7 +30,7 @@ def _verified(ctx: StepContext, state: ConversationState, party_id: str) -> Deci
     return resolve.handle(ctx, state, just_verified=True)
 
 
-def _failed(ctx: StepContext, state: ConversationState, candidate: str | None) -> Decision:
+def failed(ctx: StepContext, state: ConversationState, candidate: str | None) -> Decision:
     failed = state.counters.failed_verifications + 1
     state = state.model_copy(update={"counters": state.counters.model_copy(update={"failed_verifications": failed}),
                                      "expected_field": None})
@@ -53,14 +53,14 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
     if ctx.ctl.is_locked_out(state):
         return ctx.escalate(state, "locked_out")
     factors = state.current_values()
-    key = _factor_key(state)
+    key = factor_key(state)
     if len(factors) >= MIN_FACTORS and key != state.last_verification_key:
         state = state.model_copy(update={"last_verification_key": key})
         result = ctx.call("verify_identity", state)
         if result.ok:
             return _verified(ctx, state, result.data["party_id"])
         if result.data.get("status") == "failed":
-            return _failed(ctx, state, result.data.get("candidate_party_id"))
+            return failed(ctx, state, result.data.get("candidate_party_id"))
     remaining = askable(state)
     if len(factors) + len(remaining) < MIN_FACTORS:
         return ctx.escalate(state, "insufficient_verification_factors")

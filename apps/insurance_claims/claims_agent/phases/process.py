@@ -4,13 +4,14 @@ from claims_agent.controller import Decision, StepContext
 from claims_agent.state import ConversationState, Phase
 
 
-def present(ctx: StepContext, state: ConversationState, unmatched: tuple[str, ...] = ()) -> Decision:
+def present(ctx: StepContext, state: ConversationState, unmatched: tuple[str, ...] = (),
+            extra: dict | None = None) -> Decision:
     result = ctx.call("get_claim_details", state)
     if not result.ok:
         return ctx.escalate(state, "tool_failure")
     state = state.model_copy(update={"awaiting_anything_else": True})
     return ctx.decide(state, A.PRESENT_CASE, facts=result.facts,
-                      details={"unmatched": list(unmatched), "topic": state.intent.topic})
+                      details={"unmatched": list(unmatched), "topic": state.intent.topic, **(extra or {})})
 
 
 def _switching_claim(ctx: StepContext, state: ConversationState) -> bool:

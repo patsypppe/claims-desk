@@ -3,6 +3,7 @@ from claims_agent.audit import mask
 from claims_agent.grounding.facts import Fact, claim_detail_facts, claim_option_facts, derived_facts
 from claims_agent.grounding.followup import document_guidance, fallback_guidance, select_followup
 from claims_agent.state import PII_FIELDS, ConversationState
+from claims_agent.representatives import listed_representative
 from claims_agent.tools.mocks import EmailSendError
 from claims_agent.tools.registry import (
     ToolFailure,
@@ -11,6 +12,7 @@ from claims_agent.tools.registry import (
     require_email_consent,
     require_not_escalated,
     require_selected_case,
+    require_third_party,
     require_verified,
 )
 
@@ -86,9 +88,23 @@ def escalate_to_human(reg, state: ConversationState, reason: str = "unspecified"
     return ToolResult(ok=True, facts=(fact,), data={"ticket_id": ticket_id, "reason": reason})
 
 
+def request_representative_consent(reg, state: ConversationState) -> ToolResult:
+    """Verify the policyholder's factors, confirm the caller is their listed representative, then ask the
+    policyholder out-of-band (mock poll). Only 'approved' grants access; anything else fails closed."""
+    outcome = reg.verifier.evaluate(state)
+    if outcome.status != "verified":
+        return ToolResult(ok=False, data={"verification": outcome.status,
+                                          "candidate_party_id": outcome.candidate_party_id})
+    if listed_representative(reg.repo, state.speaker, outcome.party_id) is None:
+        return ToolResult(ok=False, data={"verification": "failed", "candidate_party_id": outcome.party_id})
+    status = reg.consent_service.request_and_poll(outcome.party_id)
+    return ToolResult(ok=status == "approved", data={"status": status, "party_id": outcome.party_id})
+
+
 def default_specs() -> list[ToolSpec]:
     return [
         ToolSpec("verify_identity", verify_identity),
+        ToolSpec("request_representative_consent", request_representative_consent, require_third_party),
         ToolSpec("search_claims", search_claims, require_verified),
         ToolSpec("get_claim_details", get_claim_details, require_selected_case),
         ToolSpec("get_followup_guidance", get_followup_guidance, require_selected_case),

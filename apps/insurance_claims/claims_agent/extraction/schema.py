@@ -56,6 +56,7 @@ class TurnAnalysis(_Strict):
     speaker_role: Literal["self", "third_party", "unknown"] = "unknown"
     stated_relationship: str | None = None
     stated_subject_name: str | None = None
+    speaker_name: str | None = None
     scope: Literal["IN_SCOPE", "OUT_OF_SCOPE", "SMALL_TALK", "AMBIGUOUS"] = "IN_SCOPE"
     emotion: Emotion = Field(default_factory=Emotion)
     consent_signal: Literal["YES", "NO", "AMBIGUOUS", "NONE"] = "NONE"

@@ -3,7 +3,7 @@ from claims_agent.audit import AuditEvent
 from claims_agent.controller import ControllerAction as A
 from claims_agent.controller import Decision, StepContext
 from claims_agent.phases import post, process, resolve, verify
-from claims_agent.policy.emotion import strategy_for
+from claims_agent.policy.emotion import HEATED, strategy_for
 from claims_agent.policy.scope import decide_scope
 from claims_agent.state import ConversationState, Phase
 
@@ -26,7 +26,9 @@ def run(ctx: StepContext, state: ConversationState) -> Decision:
     analysis = ctx.analysis
     if analysis.injection_suspected:
         ctx.events.append(AuditEvent(kind="injection_flagged", detail={"phase": state.phase.value}, turn=state.turn))
-    ctx.emotion = strategy_for(analysis.emotion.label, analysis.emotion.intensity, 0)
+    heated = state.counters.heated_turns + (1 if analysis.emotion.label in HEATED else 0)
+    state = state.model_copy(update={"counters": state.counters.model_copy(update={"heated_turns": heated})})
+    ctx.emotion = strategy_for(analysis.emotion.label, analysis.emotion.intensity, heated)
     if state.phase == Phase.ESCALATED:
         return ctx.decide(state, A.ESCALATED_HOLD)
     if state.phase == Phase.COMPLETE:

@@ -162,3 +162,8 @@ def test_leading_capitalized_phrase_not_name(rx):
                                   "The office note isn't available anymore", "I can't find the office note"])
 def test_document_unavailable_variants(rx, text):
     assert rx.analyze(text, None).intent.document_unavailable
+
+
+def test_third_party_speaker_name_not_a_pii_factor(rx):
+    a = rx.analyze("I'm David Chen, calling for my mother Margaret Chen, I'm her son.", None)
+    assert a.speaker_name == "David Chen" and fields(a) == {"name": "Margaret Chen"}

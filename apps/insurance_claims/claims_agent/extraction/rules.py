@@ -20,8 +20,9 @@ class RuleExtractor:
 
     def analyze(self, text: str, expected_field: str | None) -> TurnAnalysis:
         dob_spans = self._dob_spans(text, expected_field)
+        pii, speaker_name, subject = self._split_third_party(text, self._pii(text, expected_field, dob_spans))
         return TurnAnalysis(
-            pii_candidates=self._pii(text, expected_field, dob_spans),
+            pii_candidates=pii, speaker_name=speaker_name, stated_subject_name=subject,
             policy_number=normalize_policy(text),
             intent=self._intent(text, dob_spans),
             speaker_role=self._speaker(text),
@@ -93,6 +94,19 @@ class RuleExtractor:
             fields = [f for f, pattern in lx.FIELD_WORDS.items() if pattern.search(text)]
             fields = fields or ([expected] if expected else [])
         return [PiiCandidate(field=f, raw_value="", caller_refused=True) for f in fields]
+
+    def _split_third_party(self, text: str, pii: list[PiiCandidate]):
+        """A third-party caller's own name is not a verification factor for the policyholder."""
+        if self._speaker(text) != "third_party":
+            return pii, None, None
+        own = [c for c in pii if c.field == "name" and not c.caller_refused]
+        speaker = own[0].raw_value if own else None
+        rest = [c for c in pii if c.field != "name" or c.caller_refused]
+        subject = lx.SUBJECT_RE.search(text)
+        subject_name = subject.group(1) if subject and subject.group(1) != speaker else None
+        if subject_name:
+            rest.append(PiiCandidate(field="name", raw_value=subject_name))
+        return rest, speaker, subject_name
 
     # ---- intent ----------------------------------------------------------------------------------
     def _intent(self, text: str, dob_spans: list[str]) -> IntentHintsIn:
