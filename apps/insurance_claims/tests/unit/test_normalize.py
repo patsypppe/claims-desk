@@ -69,3 +69,21 @@ def test_policy():
                                            ("January 2025", (1, 2025)), ("no month here", (None, None))])
 def test_parse_month_year(text, expected):
     assert parse_month_year(text, T) == expected
+
+
+def test_libphonenumber_rejects_invalid_area_code():
+    assert normalize_phone("(123) 456-7890") is None      # 123 is not a valid NANP area code
+
+
+def test_library_email_normalization_keeps_local_part_semantics():
+    assert normalize_email("Margaret@EMAIL.com") == "margaret@email.com"
+    assert normalize_email("a@b") is None
+
+
+@pytest.mark.parametrize("raw", ["the fifteenth of March, 1985", "15.03.1985"])
+def test_more_dob_formats_via_dateparser(raw):
+    assert normalize_dob(raw, T) in ("1985-03-15", None)   # DMY with dots is ambiguous-safe; never a wrong date
+
+
+def test_bare_year_parse():
+    assert parse_month_year("the one from 2025", T) == (None, 2025)

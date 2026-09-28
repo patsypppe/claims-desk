@@ -178,3 +178,23 @@ def test_forgotten_field_treated_as_unavailable(rx, text, field):
 def test_name_at_sentence_start_after_other_content(rx):
     a = rx.analyze("Policy POL-1044. Margaret Chen, DOB 1985-03-15, SSN last four 4472.", None)
     assert fields(a)["name"] == "Margaret Chen"
+
+
+def test_may_verb_not_month(rx):
+    assert rx.analyze("I may need help with my dental claim", None).intent.month is None
+
+
+def test_may_as_month_still_works(rx):
+    assert rx.analyze("the claim from May 2025", None).intent.month == 5
+
+
+def test_bare_year_hint(rx):
+    assert rx.analyze("the one from 2025", None).intent.year == 2025
+
+
+def test_phone_ends_with_not_ssn(rx):
+    assert "id_last4" not in fields(rx.analyze("My phone ends with 2836", None))
+
+
+def test_ssn_ends_with_still_ssn(rx):
+    assert fields(rx.analyze("my SSN ends with 4472", None)).get("id_last4") == "4472"

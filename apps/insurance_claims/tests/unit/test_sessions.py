@@ -43,3 +43,10 @@ def test_other_customers_unaffected_by_lockout(repo):
             agent.handle(sid, line)
     r = agent.handle(agent.new_session(), "Ava Lopez, DOB 1990-08-21, SSN last four 9180")
     assert r.snapshot.verified
+
+
+def test_policy_typo_counts_attempt_but_not_cross_session_lockout(repo):
+    agent = build_agent_for_eval(repo=repo, mode="rules", today=TODAY)
+    r = agent.handle(agent.new_session(), "Policy POL-1044. Margaret Chen, DOB 1985-03-15, SSN last four 4472.")
+    assert r.snapshot.counters["failed_verifications"] == 1
+    assert agent.controller.lockouts.failures.get("P9", []) == []

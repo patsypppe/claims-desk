@@ -13,6 +13,9 @@ DATE_RES = (
 )
 FOUR_DIGITS_RE = re.compile(r"(?<![\d-])\d{4}(?![\d-])")
 ID_CUE_RE = re.compile(r"(ssn|social|last\s*(?:four|4)|national\s*id|\bid\b|ends?\s+(?:in|with))", re.I)
+ID_WORD_RE = re.compile(r"(ssn|social|last\s*(?:four|4)|national\s*id|\bid\b)", re.I)
+ENDS_RE = re.compile(r"ends?\s+(?:in|with)", re.I)
+PHONE_WORD_RE = re.compile(r"(phone|number|cell|mobile)", re.I)
 DOB_CUE_RE = re.compile(r"(dob|date of birth|birth\s*day|birthdate|born)", re.I)
 NAME_CUE_RE = re.compile(
     r"\b(?i:my name is|my name's|name is|i am|i'm|this is|it's)\s+((?:[A-Z][a-zA-Z'-]+)(?:\s+[A-Z][a-zA-Z'-]+){0,3})")

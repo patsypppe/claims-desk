@@ -66,7 +66,8 @@ class RuleExtractor:
         for m in lx.FOUR_DIGITS_RE.finditer(text):
             if any(m.group(0) in s for s in dob_spans + phones):
                 continue
-            cue = lx.ID_CUE_RE.search(text[max(0, m.start() - 30):m.start()])
+            window = text[max(0, m.start() - 30):m.start()]
+            cue = lx.ID_WORD_RE.search(window) or (lx.ENDS_RE.search(window) and not lx.PHONE_WORD_RE.search(window))
             bare = expected == "id_last4" and len(re.sub(r"[^\d]", "", text)) == 4
             if cue or bare:
                 values.append(m.group(0))

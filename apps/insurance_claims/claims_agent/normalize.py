@@ -44,21 +44,41 @@ def normalize_dob(raw: str, today: date) -> str | None:
         return _valid(int(m[3]), month_number(m[1]), int(m[2]), today)
     if m := re.search(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?" + MONTH_ALT + r"\.?,?\s+(\d{4})", text):
         return _valid(int(m[3]), month_number(m[2]), int(m[1]), today)
-    return None
+    return _dateparser_dob(raw, today)
+
+
+def _dateparser_dob(raw: str, today: date) -> str | None:
+    """Fallback for spelled-out forms ("the fifteenth of March, 1985"). US order; all parts required."""
+    if not re.search(r"\d{4}", raw):
+        return None
+    import dateparser
+
+    parsed = dateparser.parse(raw, languages=["en"], settings={
+        "DATE_ORDER": "MDY", "STRICT_PARSING": True, "REQUIRE_PARTS": ["day", "month", "year"],
+        "PREFER_DATES_FROM": "past"})
+    return _valid(parsed.year, parsed.month, parsed.day, today) if parsed else None
 
 
 def normalize_phone(raw: str) -> str | None:
-    digits = re.sub(r"\D", "", raw)
-    if len(digits) == 10:
-        return f"+1{digits}"
-    if len(digits) == 11 and digits.startswith("1"):
-        return f"+{digits}"
-    return None
+    """E.164 for valid North American numbers only (the fixture market); libphonenumber validates area codes."""
+    import phonenumbers
+
+    try:
+        number = phonenumbers.parse(raw, "US")
+    except phonenumbers.NumberParseException:
+        return None
+    if number.country_code != 1 or not phonenumbers.is_valid_number(number):
+        return None
+    return phonenumbers.format_number(number, phonenumbers.PhoneNumberFormat.E164)
 
 
 def normalize_email(raw: str) -> str | None:
-    value = raw.strip().lower()
-    return value if re.fullmatch(r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}", value) else None
+    from email_validator import EmailNotValidError, validate_email
+
+    try:
+        return validate_email(raw.strip(), check_deliverability=False).normalized.lower()
+    except EmailNotValidError:
+        return None
 
 
 def normalize_name(raw: str) -> str:
@@ -85,12 +105,30 @@ def normalize_policy(raw: str) -> str | None:
     return f"POL-{m[1]}" if m else None
 
 
+def _is_month_may(text: str, start: int, end: int) -> bool:
+    """'may' is a month only when written 'May' or followed by a day/year (not the verb 'I may need')."""
+    word = text[start:end]
+    following = text[end:end + 6]
+    return word == "May" or bool(re.match(r"\s+\d", following))
+
+
+def _bare_year(text: str, today: date) -> int | None:
+    m = re.search(r"\b(?:from|in|of|the one from|filed in|year)\s+(20\d{2})\b|^\s*(20\d{2})\s*[.!?]?\s*$", text, re.I)
+    year = int(m[1] or m[2]) if m else None
+    return year if year and year <= today.year else None
+
+
 def parse_month_year(text: str, today: date) -> tuple[int | None, int | None]:
     """Month/year hint for a CLAIM date (not a DOB). 'last <month>' resolves to the most recent one."""
     low = text.lower()
-    m = re.search(r"\b(last\s+)?" + MONTH_ALT + r"\b(?:\s+(?:of\s+)?(\d{4}))?", low)
+    m = None
+    for candidate in re.finditer(r"\b(last\s+)?" + MONTH_ALT + r"\b(?:\s+(?:of\s+)?(\d{4}))?", low):
+        if candidate[2] == "may" and not _is_month_may(text, candidate.start(2), candidate.end(2)):
+            continue
+        m = candidate
+        break
     if not m:
-        return None, None
+        return None, _bare_year(text, today)
     month = month_number(m[2])
     if m[3]:
         return month, int(m[3])

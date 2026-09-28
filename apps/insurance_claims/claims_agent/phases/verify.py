@@ -60,7 +60,10 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
         if result.ok:
             return _verified(ctx, state, result.data["party_id"])
         if result.data.get("status") == "failed":
-            return failed(ctx, state, result.data.get("candidate_party_id"))
+            # A policy-number typo with otherwise-matching PII is not evidence of an attack on the record.
+            lockout_key = None if result.data.get("internal_reason") == "policy_mismatch" else \
+                result.data.get("candidate_party_id")
+            return failed(ctx, state, lockout_key)
     remaining = askable(state)
     if len(factors) + len(remaining) < MIN_FACTORS:
         return ctx.escalate(state, "insufficient_verification_factors")
