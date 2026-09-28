@@ -75,7 +75,7 @@ function describe(event) {
     case "tool_blocked": return [`✕ ${d.tool} blocked (${d.reason})`, "blocked"];
     case "tool_failed": return [`! ${d.tool} failed (${d.reason})`, "warn"];
     case "transition": return [`→ ${d.from} ⇒ ${d.to} (${d.cause})`, "transition"];
-    case "validator_reject": return [`✕ reply rejected: ${d.violations.slice(0, 3).join(", ")}`, "blocked"];
+    case "validator_reject": return [`✕ reply rejected by validator (${d.count} issue(s))`, "blocked"];
     case "fallback_used": return [`↺ template fallback (${d.reason})`, "warn"];
     case "llm_value_rejected": return [`✕ LLM value not in caller text (${d.field})`, "blocked"];
     case "injection_flagged": return ["⚑ injection attempt flagged — state unchanged", "blocked"];

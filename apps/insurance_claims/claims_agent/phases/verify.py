@@ -3,6 +3,7 @@ from claims_agent.controller import ControllerAction as A
 from claims_agent.controller import Decision, StepContext
 from claims_agent.phases import resolve
 import re
+import time
 
 from claims_agent.state import ConversationState, Phase, Verification
 from claims_agent.verification import MIN_FACTORS
@@ -57,7 +58,9 @@ def _otp_turn(ctx: StepContext, state: ConversationState) -> Decision:
     match = OTP_CODE_RE.search(ctx.text)
     if not match:
         return ctx.decide(state, A.OTP_REMIND)
+    started = time.monotonic()
     result = ctx.call("verify_otp", state, code=match.group(1))
+    ctx.ctl.pad_verification(started)
     status = result.data.get("status")
     if result.ok and not ctx.ctl.is_locked_out(result.data["party_id"]):
         return _verified(ctx, state, result.data["party_id"], method="otp")
@@ -105,7 +108,9 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
     key = factor_key(state)
     if len(factors) >= MIN_FACTORS and key != state.last_verification_key:
         state = state.model_copy(update={"last_verification_key": key})
+        started = time.monotonic()
         result = ctx.call("verify_identity", state)
+        ctx.ctl.pad_verification(started)
         if result.ok and ctx.ctl.is_locked_out(result.data["party_id"]):
             return failed(ctx, state, result.data["party_id"])  # same reply as any mismatch: no oracle
         if result.ok:

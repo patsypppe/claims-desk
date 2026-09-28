@@ -1,5 +1,6 @@
 """Turn pipeline: extract -> remember -> control -> tools -> context -> respond -> validate."""
 import os
+import threading
 from datetime import date
 
 from claims_agent.audit import AuditEvent
@@ -44,6 +45,12 @@ class Agent:
         self.repo, self.settings, self.clock, self.controller = repo, settings, clock, controller
         self.extraction_llm, self.responder, self.sessions, self.validator = extraction_llm, responder, sessions, validator
         self.use_llm = not isinstance(extraction_llm, NullLLM)
+        self._locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
+
+    def _session_lock(self, session_id: str) -> threading.Lock:
+        with self._locks_guard:
+            return self._locks.setdefault(session_id, threading.Lock())
 
     def new_session(self, channel_token: str | None = None) -> str:
         return self.sessions.create(channel_token=channel_token)
@@ -114,6 +121,10 @@ class Agent:
         return reply, cited, events
 
     def handle(self, session_id: str, text: str, sensitive: bool = False) -> TurnResult:
+        with self._session_lock(session_id):  # one turn at a time per session: no lost updates / double sends
+            return self._handle(session_id, text, sensitive)
+
+    def _handle(self, session_id: str, text: str, sensitive: bool) -> TurnResult:
         state = self.sessions.get(session_id)
         text = (text or "")[:MAX_INPUT_CHARS]
         state = state.model_copy(update={"turn": state.turn + 1})
@@ -147,12 +158,22 @@ def _registry(repo, clock, settings, email_fails=False, consent_scenario="defaul
                         enforce_permissions=not no_guard)
 
 
+def _stores(settings: Settings, lockouts):
+    if settings.storage == "sqlite":
+        from claims_agent.storage.sqlite_store import SqliteLockoutRegistry, SqliteSessionStore
+
+        return (SqliteSessionStore(settings.sqlite_path, ttl_seconds=settings.session_ttl_minutes * 60),
+                lockouts or SqliteLockoutRegistry(settings.sqlite_path))
+    return SessionStore(ttl_seconds=settings.session_ttl_minutes * 60), lockouts or LockoutRegistry()
+
+
 def assemble(*, repo, settings, clock, extraction_llm, responder, registry, validator=None,
-             lockouts: LockoutRegistry | None = None, guard=None) -> Agent:
+             lockouts: LockoutRegistry | None = None, guard=None, sleeper=None) -> Agent:
+    sessions, lockouts = _stores(settings, lockouts)
     controller = WorkflowController(repo=repo, registry=registry, settings=settings, clock=clock,
-                                    lockouts=lockouts or LockoutRegistry())
+                                    lockouts=lockouts, sleeper=sleeper)
     return Agent(repo=repo, settings=settings, clock=clock, controller=controller, extraction_llm=extraction_llm,
-                 responder=responder, sessions=SessionStore(ttl_seconds=settings.session_ttl_minutes * 60),
+                 responder=responder, sessions=sessions,
                  validator=validator if validator is not None else ResponseValidator(repo), guard=guard)
 
 
@@ -160,12 +181,14 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
                          email_fails: bool = False, scripted_analyses: list | None = None,
                          no_validator: bool = False, no_guard: bool = False, responder_llm=None,
                          leaky_responder: bool = False, guard=None, verification_policy: str = "any3_or_otp",
-                         otp_codes=None, channel_key: str | None = None) -> Agent:
+                         otp_codes=None, channel_key: str | None = None, verify_min_ms: int = 0,
+                         sleeper=None) -> Agent:
     from pydantic import SecretStr
 
     settings = Settings(agent_mode="rules" if mode == "rules" else "llm", app_today=today,
                         consent_scenario=consent_scenario, verification_policy=verification_policy,
-                        channel_signing_key=SecretStr(channel_key) if channel_key else None)
+                        channel_signing_key=SecretStr(channel_key) if channel_key else None,
+                        verify_min_ms=verify_min_ms)
     clock = FixedClock(today)
     responder: Responder = TemplateResponder()
     if mode == "fake":
@@ -189,7 +212,7 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
         responder = LLMResponder(responder_llm)
     registry = _registry(repo, clock, settings, email_fails, consent_scenario, no_guard, otp_codes)
     agent = assemble(repo=repo, settings=settings, clock=clock, extraction_llm=extraction_llm,
-                     responder=responder, registry=registry, guard=guard)
+                     responder=responder, registry=registry, guard=guard, sleeper=sleeper)
     if no_validator:
         agent.validator = None
     return agent

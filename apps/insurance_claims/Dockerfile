@@ -6,12 +6,12 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY claims_agent ./claims_agent
 COPY evals ./evals
-RUN pip install --upgrade pip && pip install .
+RUN pip install --upgrade pip && pip install . && python -m spacy download en_core_web_sm
 
 COPY fixtures ./fixtures
 COPY web ./web
 
-RUN useradd --create-home --uid 10001 appuser
+RUN useradd --create-home --uid 10001 appuser && mkdir -p /data && chown appuser /data
 USER appuser
 
 ENV FIXTURES_DIR=/app/fixtures

@@ -9,3 +9,4 @@ apps/insurance_claims/evals/reports/
 .superpowers/
 .DS_Store
 *.egg-info/
+data/

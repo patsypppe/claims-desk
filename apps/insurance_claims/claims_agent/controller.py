@@ -101,9 +101,19 @@ class StepContext:
 
 class WorkflowController:
     def __init__(self, *, repo: FixtureRepository, registry: ToolRegistry, settings: Settings, clock,
-                 lockouts=None) -> None:
+                 lockouts=None, sleeper=None) -> None:
         self.repo, self.registry, self.settings, self.clock = repo, registry, settings, clock
         self.lockouts = lockouts
+        self._sleeper = sleeper
+
+    def pad_verification(self, started: float) -> None:
+        """Every identity evaluation takes at least verify_min_ms, whatever its outcome (timing side channel)."""
+        import time
+
+        target = self.settings.verify_min_ms / 1000
+        remaining = target - (time.monotonic() - started)
+        if target > 0 and remaining > 0:
+            (self._sleeper or time.sleep)(remaining)
 
     def record_verification_failure(self, candidate_party_id: str | None) -> None:
         if self.lockouts is not None and candidate_party_id:

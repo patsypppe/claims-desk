@@ -100,6 +100,11 @@ class Settings:
     presidio_scan: bool = False
     verification_policy: str = "any3_or_otp"
     channel_signing_key: SecretStr | None = field(default=None, repr=False)
+    storage: str = "memory"
+    sqlite_path: Path = REPO_ROOT / "data" / "claims_agent.db"
+    verify_min_ms: int = 0
+    cookie_secure: bool = False
+    session_create_limit: int = 20
     mock_otp_reveal: bool = False
     prompt_guard_model: str = "meta-llama/llama-prompt-guard-2-86m"
     safeguard_model: str = "openai/gpt-oss-safeguard-20b"
@@ -141,12 +146,17 @@ class Settings:
             max_clarifications=_int_env("MAX_CLARIFICATIONS", 3),
             lockout_failures=_int_env("LOCKOUT_FAILURES", 5),
             require_knowledge_factor=_bool_env("REQUIRE_KNOWLEDGE_FACTOR", False),
-            debug_panel=_bool_env("DEBUG_PANEL", True),
+            debug_panel=_bool_env("DEBUG_PANEL", mode == "rules" or os.environ.get("APP_ENV", "dev") == "dev"),
             session_ttl_minutes=_int_env("SESSION_TTL_MINUTES", 30),
             guard_enabled=_bool_env("GUARD_ENABLED", True),
             presidio_scan=_bool_env("PRESIDIO_SCAN", True),
             verification_policy=_policy_env(),
             mock_otp_reveal=_bool_env("MOCK_OTP_REVEAL", False),
+            storage=(os.environ.get("STORAGE") or "memory").strip().lower(),
+            sqlite_path=Path(os.environ.get("SQLITE_PATH") or REPO_ROOT / "data" / "claims_agent.db"),
+            verify_min_ms=_int_env("VERIFY_FAILURE_MIN_MS", 400),
+            cookie_secure=_bool_env("COOKIE_SECURE", False),
+            session_create_limit=_int_env("SESSION_CREATE_LIMIT", 20),
             channel_signing_key=SecretStr(os.environ["CHANNEL_SIGNING_KEY"])
             if os.environ.get("CHANNEL_SIGNING_KEY") else None,
             prompt_guard_model=os.environ.get("PROMPT_GUARD_MODEL") or "meta-llama/llama-prompt-guard-2-86m",

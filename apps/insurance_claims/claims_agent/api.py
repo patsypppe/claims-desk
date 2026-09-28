@@ -43,6 +43,14 @@ class ChatIn(BaseModel):
         return value
 
 
+def _public_event(event) -> dict:
+    """Debug view: validator internals (which atom was rejected) are summarized, not exposed."""
+    data = event.model_dump(mode="json")
+    if "violations" in data["detail"]:
+        data["detail"] = {"count": len(data["detail"]["violations"])}
+    return data
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     agent = build_agent(settings)
@@ -56,21 +64,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     def _set_cookie(response: Response, sid: str) -> None:
-        response.set_cookie("sid", sid, httponly=True, samesite="strict", max_age=settings.session_ttl_minutes * 60)
+        response.set_cookie("sid", sid, httponly=True, samesite="strict", secure=settings.cookie_secure,
+                            max_age=settings.session_ttl_minutes * 60)
 
-    def _rate_limited(sid: str) -> bool:
-        now, window = time.monotonic(), hits[sid]
+    def _rate_limited(key: str, limit: int) -> bool:
+        now, window = time.monotonic(), hits[key]
         while window and now - window[0] > RATE_WINDOW_S:
             window.popleft()
         window.append(now)
-        return len(window) > RATE_LIMIT
+        if len(hits) > 10_000:  # prune idle keys so the map can't grow without bound
+            for idle in [k for k, w in hits.items() if not w or now - w[-1] > RATE_WINDOW_S]:
+                hits.pop(idle, None)
+        return len(window) > limit
 
     @app.get("/healthz")
     def health() -> dict:
         return {"status": "ok", "mode": settings.agent_mode}
 
     @app.post("/api/session")
-    def new_session(response: Response, body: SessionIn | None = None) -> dict:
+    def new_session(request: Request, response: Response, body: SessionIn | None = None) -> dict:
+        client = request.client.host if request.client else "unknown"
+        if _rate_limited(f"create:{client}", settings.session_create_limit):
+            raise HTTPException(status_code=429, detail="Too many new conversations. Please wait a minute.")
+        agent.sessions.prune()
         _set_cookie(response, agent.new_session(channel_token=body.channel_token if body else None))
         return {"ok": True, "mode": settings.agent_mode, "debug_panel": settings.debug_panel}
 
@@ -85,7 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def chat(body: ChatIn, sid: str | None = Cookie(default=None)) -> dict:
         if not sid:
             raise HTTPException(status_code=401, detail="No session. Start a new conversation.")
-        if _rate_limited(sid):
+        if _rate_limited(f"chat:{sid}", RATE_LIMIT):
             raise HTTPException(status_code=429, detail="Too many messages. Please slow down.")
         try:
             result = agent.handle(sid, body.text, sensitive=body.sensitive)
@@ -96,7 +112,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         payload = {"reply": result.reply}
         if settings.debug_panel:
             payload["snapshot"] = result.snapshot.model_dump(mode="json")
-            payload["events"] = [e.model_dump(mode="json") for e in result.events]
+            payload["events"] = [_public_event(e) for e in result.events]
         return payload
 
     @app.exception_handler(Exception)

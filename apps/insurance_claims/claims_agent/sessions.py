@@ -59,3 +59,9 @@ class SessionStore:
 
     def drop(self, sid: str) -> None:
         self._states.pop(sid, None)
+
+    def prune(self) -> int:
+        expired = [sid for sid, (_, seen) in self._states.items() if self.now() - seen > self.ttl_seconds]
+        for sid in expired:
+            del self._states[sid]
+        return len(expired)
