@@ -106,6 +106,18 @@ def _merge_action(rules: str, llm: str, text: str, injection: bool) -> str:
     return rules
 
 
+def _merge_scope(rules: TurnAnalysis, llm: TurnAnalysis, text: str, pii: list) -> str:
+    """An LLM OUT_OF_SCOPE label only counts when nothing deterministic says the turn is in scope."""
+    from claims_agent.extraction import lexicon as lx
+
+    if llm.scope != "OUT_OF_SCOPE" or rules.scope == "OUT_OF_SCOPE":
+        return llm.scope if llm.scope != "OUT_OF_SCOPE" else rules.scope
+    in_scope_evidence = (lx.INSURANCE_RE.search(text) or rules.injection_suspected or llm.injection_suspected
+                         or pii or rules.requested_action in ("done", "request_human")
+                         or rules.consent_signal in ("YES", "NO") or re.search(r"\bverif", text, re.I))
+    return rules.scope if in_scope_evidence else "OUT_OF_SCOPE"
+
+
 def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: date,
           turn: int = 0) -> tuple[TurnAnalysis, list[AuditEvent]]:
     if llm is None:
@@ -118,7 +130,8 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
     relationship = rules.stated_relationship or (
         llm.stated_relationship if _in_text(llm.stated_relationship, text) else None)
     speaker = rules.speaker_name or (llm.speaker_name if _in_text(llm.speaker_name, text) else None)
-    if speaker:  # a third-party caller's own name is never the policyholder's name factor
+    third_party = "third_party" in (rules.speaker_role, llm.speaker_role)
+    if speaker and third_party:  # a third-party caller's own name is never the policyholder's name factor
         from claims_agent.normalize import name_tokens
         pii = [c for c in pii if c.field != "name" or c.caller_refused or name_tokens(c.raw_value) != name_tokens(speaker)]
         if rules.stated_subject_name and not any(c.field == "name" and not c.caller_refused for c in pii):
@@ -133,7 +146,7 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
         stated_subject_name=rules.stated_subject_name or (
             llm.stated_subject_name if _in_text(llm.stated_subject_name, text) else None),
         speaker_name=speaker,
-        scope=llm.scope, emotion=llm.emotion,
+        scope=_merge_scope(rules, llm, text, pii), emotion=llm.emotion,
         consent_signal=_merge_consent(rules.consent_signal, llm.consent_signal),
         requested_action=_merge_action(rules.requested_action, llm.requested_action, text,
                                        rules.injection_suspected or llm.injection_suspected),

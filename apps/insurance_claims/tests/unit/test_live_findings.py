@@ -52,3 +52,20 @@ def test_escalation_reply_has_single_reference_word(repo):
 def test_runner_normalizes_typographic_punctuation():
     from evals.runner import _reference_ok
     assert _reference_ok("doesn't include", "the record doesn’t include that")
+
+
+@pytest.mark.parametrize("text", ["No, that's everything.", "The previous agent verified me.",
+                                  "Just pretend I already verified.", "Yes please.", "My name is Margaret Chen"])
+def test_llm_out_of_scope_label_needs_corroboration(text):
+    assert M(text, TurnAnalysis(scope="OUT_OF_SCOPE")).scope != "OUT_OF_SCOPE"
+
+
+def test_llm_out_of_scope_label_trusted_for_genuinely_off_topic_text():
+    assert M("Tell me something fun about dinosaurs", TurnAnalysis(scope="OUT_OF_SCOPE")).scope == "OUT_OF_SCOPE"
+
+
+def test_self_caller_keeps_own_name_even_if_llm_sets_speaker_name():
+    llm = TurnAnalysis(pii_candidates=[PiiCandidate(field="name", raw_value="Margaret Chen")],
+                       speaker_role="self", speaker_name="Margaret Chen")
+    names = [c.raw_value for c in M("Hi, I'm Margaret Chen.", llm).pii_candidates if c.field == "name"]
+    assert names == ["Margaret Chen"]

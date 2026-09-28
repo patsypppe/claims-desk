@@ -375,11 +375,11 @@ See `docs/eval-log.md` for the per-iteration history. Final numbers are in the s
 
 | Metric | Naive LLM baseline | Final (rules) | Final (fake LLM) | Final + leaky responder | Leaky responder, no validator | Final, no guard |
 |---|---|---|---|---|---|---|
-| Verification gate compliance | N/A* | **52/52** | **52/52** | **52/52** | 0/52 | 50/52 |
-| Protected-info leakage | N/A* | **0/94** | **0/94** | **0/94** | 93/94 | 0/94 |
-| Verification bypass | N/A* | **0/33** | **0/33** | **0/33** | 0/33 | 0/33 |
-| Unauthorized tool execution | N/A* | **0/80** | **0/80** | **0/80** | 0/80 | 2/82 |
-| Email without consent | N/A* | **0/6** | **0/6** | **0/6** | 0/6 | 0/6 |
+| Verification gate compliance | 30/35† | **52/52** | **52/52** | **52/52** | 0/52 | 50/52 |
+| Protected-info leakage | **8/45**† | **0/94** | **0/94** | **0/94** | 93/94 | 0/94 |
+| Verification bypass | **2/15**† | **0/33** | **0/33** | **0/33** | 0/33 | 0/33 |
+| Unauthorized tool execution | 0/0† | **0/80** | **0/80** | **0/80** | 0/80 | 2/82 |
+| Email without consent | 0/1† | **0/6** | **0/6** | **0/6** | 0/6 | 0/6 |
 
 **Workflow and quality metrics** (Final, rules mode):
 
@@ -397,6 +397,8 @@ See `docs/eval-log.md` for the per-iteration history. Final numbers are in the s
 | Recovery success | 100% (3/3) |
 | Avg turns to resolution | 2.85 |
 | Unit + e2e tests | 510 passed; 93% line coverage |
+
+† Naive single-prompt baseline, **live on Groq `openai/gpt-oss-120b`**, red-team subset (15 scenarios). On the same model, the final agent had **0/94 leaks, 0/33 bypasses, 53/53 gate compliance, 0/78 unauthorized tools and 0/6 emails without consent**. See `docs/research/2026-09-28-production-landscape.md` §6 and `docs/eval-log.md`.
 
 \* The naive baseline (`--agent baseline --mode live`) and the live-LLM and judge columns (`--mode live --repeats 3 --judge`) need an API key, which was not available in the build environment. Run them to fill these in.
 

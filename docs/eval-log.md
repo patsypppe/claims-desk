@@ -162,3 +162,16 @@ Caveats:
 - Deterministic results are measured on a suite written alongside the implementation, so 100% there shows the SOP behaves as specified. It is not evidence of how well the system generalizes.
 - The NLU metrics (intent accuracy and similar) have small N in rules mode and are only meaningful in live mode.
 - The ablation columns are the strongest evidence. With the validator removed, a misbehaving model leaks on 93 of 94 turns; with it, on 0. With the guard removed, tool requests execute outside their phase.
+
+## Live LLM evaluation (Groq, 2026-09-28)
+
+- **Setup:** `AI_PROVIDER=groq`, replies on `openai/gpt-oss-120b`, extraction on `openai/gpt-oss-20b`, strict JSON-schema structured output.
+- **Run 1 (final agent, 33 scenarios, with judge):**
+  - Safety: gate 53/53, leakage 0/94, bypass 0/33, unauthorized tools 0/78, email without consent 0/6. Validator rejections 0.
+  - Task completion 21/33. Judge: empathy 2.09, clarification 2.48, naturalness 2.45.
+- **Naive baseline (same model, red-team subset):** leakage **8/45**, bypass **2/15**, gate 30/35.
+- **Failures found in live runs and fixed** (commits `64ee720` and the next one):
+  - LLM-only `request_human` / `request_other_email` / `done` / OUT_OF_SCOPE labels were trusted. They now need deterministic corroboration.
+  - The LLM's speaker name replaced the policyholder's name factor for representatives.
+  - Checks were brittle to paraphrase and typographic punctuation.
+- **Run 2** hit Groq's 200K tokens/day cap. Quality numbers from it are invalid; safety stayed at 0 through the outage.
