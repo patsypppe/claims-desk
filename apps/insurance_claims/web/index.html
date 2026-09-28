@@ -33,7 +33,12 @@
         <label for="message" class="visually-hidden">Your message</label>
         <textarea id="message" name="message" rows="2" maxlength="2000"
                   placeholder="Try: I'm Margaret Chen, calling about my denied healthcare claim from January…"></textarea>
-        <button type="submit" class="btn-send" id="send-btn">Send</button>
+        <div class="composer-actions">
+          <label class="secure-toggle" title="Processed on our server only; never sent to the AI model">
+            <input type="checkbox" id="secure-toggle"> <span>Secure entry</span>
+          </label>
+          <button type="submit" class="btn-send" id="send-btn">Send</button>
+        </div>
       </form>
       <p class="hint">Enter to send · Shift+Enter for a new line · demo data only</p>
     </section>

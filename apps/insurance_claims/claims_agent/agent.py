@@ -13,6 +13,7 @@ from claims_agent.extraction.merge import apply_analysis, merge
 from claims_agent.extraction.rules import RuleExtractor
 from claims_agent.extraction.schema import TurnAnalysis
 from claims_agent.llm.client import FakeLLM, LLMClient, NullLLM
+from claims_agent.privacy.redact import redact, restore_analysis
 from claims_agent.response.context import authorized_values, build_context
 from claims_agent.response.llm_responder import LLMResponder
 from claims_agent.response.responder import Responder, TemplateResponder
@@ -47,19 +48,31 @@ class Agent:
     def new_session(self) -> str:
         return self.sessions.create()
 
-    def _understand(self, state, text: str) -> tuple[TurnAnalysis, list[AuditEvent], bool]:
+    def _llm_analysis(self, state, text: str, events: list) -> TurnAnalysis | None:
+        """Only redacted text reaches the provider; placeholders are restored deterministically."""
+        redaction = redact(text, self.clock.today())
+        llm = LLMExtractor(self.extraction_llm).analyze(
+            redaction.text, phase=state.phase.value, expected_field=state.expected_field,
+            offer_pending=state.offer_id is not None and state.consent.value == "OFFERED")
+        if llm is None:
+            return None
+        restored, restore_events = restore_analysis(llm, redaction.mapping, state.turn)
+        events.extend(restore_events)
+        return restored
+
+    def _understand(self, state, text: str, sensitive: bool = False) -> tuple[TurnAnalysis, list[AuditEvent], bool]:
         today = self.clock.today()
         rules = RuleExtractor(today=today).analyze(text, state.expected_field)
-        llm = None
-        if self.use_llm:
-            llm = LLMExtractor(self.extraction_llm).analyze(
-                text, phase=state.phase.value, expected_field=state.expected_field,
-                offer_pending=state.offer_id is not None and state.consent.value == "OFFERED")
+        pre_events: list[AuditEvent] = []
+        use_llm = self.use_llm and not sensitive  # secure-field turns never leave the server
+        llm = self._llm_analysis(state, text, pre_events) if use_llm else None
         merged, events = merge(rules=rules, llm=llm, text=text, today=today, turn=state.turn)
-        degraded = self.use_llm and llm is None
+        events = pre_events + events
+        degraded = use_llm and llm is None
         if degraded:
             events.append(AuditEvent(kind="llm_degraded", detail={"stage": "extraction"}, turn=state.turn))
-        merged = self._apply_guard(merged, text, state.turn, events)
+        if not sensitive:
+            merged = self._apply_guard(merged, text, state.turn, events)
         return merged, events, degraded
 
     def _apply_guard(self, analysis: TurnAnalysis, text: str, turn: int, events: list) -> TurnAnalysis:
@@ -100,11 +113,11 @@ class Agent:
             reply, cited = SAFE_FALLBACK, []
         return reply, cited, events
 
-    def handle(self, session_id: str, text: str) -> TurnResult:
+    def handle(self, session_id: str, text: str, sensitive: bool = False) -> TurnResult:
         state = self.sessions.get(session_id)
         text = (text or "")[:MAX_INPUT_CHARS]
         state = state.model_copy(update={"turn": state.turn + 1})
-        analysis, events, degraded = self._understand(state, text)
+        analysis, events, degraded = self._understand(state, text, sensitive)
         state, conflicts = apply_analysis(state, analysis, turn=state.turn, today=self.clock.today())
         state = state.model_copy(update={"degraded": degraded})
         decision = self.controller.step(state, analysis, text, conflicts)
@@ -210,5 +223,10 @@ def build_agent(settings: Settings, repo: FixtureRepository | None = None,
     extraction_llm, responder_llm = llm_clients(settings)
     responder = LLMResponder(responder_llm) if responder_llm else TemplateResponder()
     registry = _registry(repo, clock, settings, consent_scenario=settings.consent_scenario)
+    validator = None
+    if settings.presidio_scan:
+        from claims_agent.privacy.presidio_scan import PresidioScanner
+
+        validator = ResponseValidator(repo, pii_scanner=PresidioScanner.try_create())
     return assemble(repo=repo, settings=settings, clock=clock, extraction_llm=extraction_llm, responder=responder,
-                    registry=registry, lockouts=lockouts, guard=build_guard(settings))
+                    registry=registry, lockouts=lockouts, guard=build_guard(settings), validator=validator)

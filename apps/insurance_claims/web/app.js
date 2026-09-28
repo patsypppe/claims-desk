@@ -119,12 +119,12 @@ async function startSession(path = "/api/session") {
     expected_field: null, degraded: false });
 }
 
-async function send(text) {
-  addMessage("You", text, "caller");
+async function send(text, sensitive) {
+  addMessage("You", sensitive ? "•••• (secure entry)" : text, "caller");
   const pending = addMessage("Agent", "…", "agent typing");
   $("send-btn").disabled = true;
   try {
-    const data = await post("/api/chat", { text });
+    const data = await post("/api/chat", { text, sensitive });
     turn += 1;
     pending.remove();
     addMessage("Agent", data.reply, "agent");
@@ -147,7 +147,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const text = input.value.trim();
     if (!text) return;
     input.value = "";
-    send(text);
+    const secure = $("secure-toggle");
+    send(text, secure.checked);
+    secure.checked = false;
   });
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); }

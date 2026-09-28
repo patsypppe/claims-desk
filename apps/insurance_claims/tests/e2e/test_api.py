@@ -71,3 +71,13 @@ def test_llm_mode_without_key_fails_startup(monkeypatch):
     monkeypatch.setenv("AGENT_MODE", "llm")
     with pytest.raises(ConfigError):
         create_app()
+
+
+def test_sensitive_flag_accepted(client):
+    client.post("/api/session")
+    body = client.post("/api/chat", json={"text": "4472", "sensitive": True}).json()
+    assert body["snapshot"]["phase"] == "VERIFY_ID"
+
+
+def test_ui_has_secure_entry_toggle(client):
+    assert 'id="secure-toggle"' in client.get("/").text

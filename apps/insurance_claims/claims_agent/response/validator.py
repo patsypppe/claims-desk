@@ -73,8 +73,9 @@ def _date_keys(text: str) -> set[str]:
 
 
 class ResponseValidator:
-    def __init__(self, repo: FixtureRepository) -> None:
+    def __init__(self, repo: FixtureRepository, pii_scanner=None) -> None:
         self._repo = repo
+        self._scanner = pii_scanner
         self._documents = sorted({d.lower() for c in repo.claims for d in c.documents_needed}
                                  | {k.lower() for k in DOC_ALIASES} | {k.lower() for k in repo.guideline.document_guidance},
                                  key=len, reverse=True)
@@ -128,6 +129,15 @@ class ResponseValidator:
             return any(value in vals for pid, vals in self._pii.items() if pid != party)
         return False
 
+    def _scanner_violations(self, reply: str, ctx: ResponseContext) -> list[str]:
+        """Second opinion from Presidio: contact details / SSNs never appear unless they are allowlisted facts."""
+        if self._scanner is None:
+            return []
+        allowed = " ".join(f"{f.value} {f.display}" for f in ctx.facts).lower()
+        return [f"pii_scan:{entity}" for entity, value in self._scanner.scan(reply)
+                if entity in ("PHONE_NUMBER", "EMAIL_ADDRESS", "US_SSN") and value.lower() not in allowed
+                and "*" not in value]
+
     def validate(self, reply: str, cited: list[str], ctx: ResponseContext, caller_text: str) -> ValidationResult:
         violations: list[str] = []
         fact_ids = {f.fact_id for f in ctx.facts}
@@ -143,6 +153,7 @@ class ResponseValidator:
             allowed = self._allowed(ctx) | {f"name:{party}"}
             for atom in sorted(atoms - allowed):
                 violations.append(("other_party:" if self._other_party(atom, party) else "ungrounded:") + atom)
+        violations += self._scanner_violations(reply, ctx)
         if any(f.label == "appeal_deadline_status" and f.value == "passed" for f in ctx.facts) \
                 and LIVE_DEADLINE_RE.search(reply):
             violations.append("deadline_presented_as_live")

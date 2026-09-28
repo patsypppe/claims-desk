@@ -29,6 +29,7 @@ SECURITY_HEADERS = {
 
 class ChatIn(BaseModel):
     text: str = Field(min_length=1, max_length=MAX_INPUT_CHARS)
+    sensitive: bool = False  # "secure field": this turn is processed on-server only (never sent to an LLM)
 
     @field_validator("text")
     @classmethod
@@ -83,7 +84,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if _rate_limited(sid):
             raise HTTPException(status_code=429, detail="Too many messages. Please slow down.")
         try:
-            result = agent.handle(sid, body.text)
+            result = agent.handle(sid, body.text, sensitive=body.sensitive)
         except UnknownSessionError:
             raise HTTPException(status_code=401, detail="Session expired. Start a new conversation.") from None
         log.info("turn phase=%s escalated=%s events=%s", result.snapshot.phase, result.snapshot.escalated,

@@ -15,6 +15,8 @@ Rules:
 - pii_candidates: copy the caller's exact words for name, dob, phone, email or id_last4 (last 4 of SSN or
   national ID) in raw_value. Never reformat or invent values. If the caller refuses a field, add it with
   caller_refused=true and raw_value="". Set is_correction when they are fixing an earlier value.
+- Sensitive values (dates, digits, phones, emails) are replaced by placeholders such as ⟦DOB_1⟧ or ⟦ID4_1⟧.
+  Copy the placeholder itself as raw_value; never guess the hidden value.
 - A bare value with no label refers to the field in controller_context.expected_field.
 - policy_number is a lookup hint, not a verification factor.
 - intent: claim hints (case_type, status, month/year of the CLAIM - never the birth date, claim_id),

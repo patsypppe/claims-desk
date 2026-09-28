@@ -159,3 +159,8 @@ button { font: inherit; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+.composer-actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.composer-actions .btn-send { flex: 1; }
+.secure-toggle { display: inline-flex; align-items: center; gap: 6px; font: 500 0.72rem var(--font-mono);
+  color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+.secure-toggle input { accent-color: var(--accent); }
