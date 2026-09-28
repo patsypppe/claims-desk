@@ -96,12 +96,26 @@ def _present(ctx: ResponseContext) -> str:
     return "".join(parts)
 
 
+def _sentences(ctx: ResponseContext) -> list[str]:
+    by_id = {f.fact_id: f for f in ctx.facts}
+    chosen = [by_id[i] for i in ctx.details.get("answer_ids", []) if i in by_id]
+    lines, docs = [], [f.display for f in chosen if f.label == "document_needed"]
+    for f in chosen:
+        if f.label == "status":
+            lines.append(f"Claim {_fact(ctx, 'case_id')} is currently {f.display}.")
+        elif f.label == "denial_reason":
+            lines.append(f"The denial reason on file is that {f.display}.")
+        elif f.label != "document_needed":
+            lines.append(f.display)
+    if docs:
+        lines.append(f"To have it reconsidered, the reviewer needs the {join_list(docs)}.")
+    return lines
+
+
 def _answer(ctx: ResponseContext) -> str:
-    lines = [f.display for f in ctx.facts if f.label == "answer"]
-    if not lines:
-        lines = [f"Claim {_fact(ctx, 'case_id')} is currently {_fact(ctx, 'status')}."]
-        if reason := _fact(ctx, "denial_reason"):
-            lines.append(f"The denial reason on file is that {reason}.")
+    lines = _sentences(ctx) or [f"Claim {_fact(ctx, 'case_id')} is currently {_fact(ctx, 'status')}."]
+    if ctx.details.get("offer_human"):
+        return " ".join(lines) + " Would you like me to connect you with a claims representative?"
     return " ".join(lines) + " Is there anything else I can help you with on this claim?"
 
 

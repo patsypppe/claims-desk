@@ -40,7 +40,6 @@ def handle(ctx: StepContext, state: ConversationState) -> Decision:
     result = ctx.call("get_claim_details", state)
     if not result.ok:
         return ctx.escalate(state, "tool_failure")
-    state = state.model_copy(update={"awaiting_anything_else": True})
-    return ctx.decide(state, A.ANSWER, facts=result.facts,
-                      details={"asked_attribute": ctx.analysis.intent.asked_attribute,
-                               "topic": ctx.analysis.intent.topic})
+    from claims_agent.phases.answers import answer
+
+    return answer(ctx, state.model_copy(update={"awaiting_anything_else": True}), result.facts)

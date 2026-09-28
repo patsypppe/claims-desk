@@ -1,6 +1,7 @@
 """Tool implementations. Identity scope always comes from state, never from arguments."""
 from claims_agent.audit import mask
-from claims_agent.grounding.facts import Fact, claim_detail_facts, claim_option_facts
+from claims_agent.grounding.facts import Fact, claim_detail_facts, claim_option_facts, derived_facts
+from claims_agent.grounding.followup import document_guidance, fallback_guidance, select_followup
 from claims_agent.state import PII_FIELDS, ConversationState
 from claims_agent.tools.mocks import EmailSendError
 from claims_agent.tools.registry import (
@@ -30,7 +31,31 @@ def get_claim_details(reg, state: ConversationState, case_id: str | None = None)
     # Other parties' claims and non-existent claims are indistinguishable to the caller.
     if claim is None or claim.party_id != state.verification.party_id:
         return ToolResult(ok=False, error="not_on_account")
-    return ToolResult(ok=True, facts=claim_detail_facts(claim), data={"case_id": claim.case_id})
+    facts = claim_detail_facts(claim) + derived_facts(claim, reg.clock.today())
+    return ToolResult(ok=True, facts=facts, data={"case_id": claim.case_id})
+
+
+def _guidance_fact(case_id: str, kind: str, guidance) -> Fact:
+    return Fact(fact_id=f"guideline.{kind}.{guidance.topic}@{case_id}", label="answer", value=guidance.text,
+                display=guidance.text)
+
+
+def get_followup_guidance(reg, state: ConversationState, topic: str = "none", text: str = "",
+                          followup_topic: str = "none", document_unavailable: bool = False) -> ToolResult:
+    claim = reg.repo.claim(state.selected_case_id)
+    guidance = select_followup(reg.repo.guideline, claim, topic, text, followup_topic, document_unavailable)
+    guidance = guidance or fallback_guidance(reg.repo.guideline, claim)
+    if guidance is None:
+        return ToolResult(ok=False, error="no_guidance")
+    return ToolResult(ok=True, facts=(_guidance_fact(claim.case_id, "followup", guidance),),
+                      data={"topic": guidance.topic})
+
+
+def get_document_guidance(reg, state: ConversationState, document: str = "", unavailable: bool = False) -> ToolResult:
+    claim = reg.repo.claim(state.selected_case_id)
+    guidance = document_guidance(reg.repo.guideline, claim, document, unavailable)
+    return ToolResult(ok=True, facts=(_guidance_fact(claim.case_id, "document", guidance),),
+                      data={"topic": guidance.topic})
 
 
 def send_summary_email(reg, state: ConversationState, subject: str = "", body: str = "") -> ToolResult:
@@ -66,6 +91,8 @@ def default_specs() -> list[ToolSpec]:
         ToolSpec("verify_identity", verify_identity),
         ToolSpec("search_claims", search_claims, require_verified),
         ToolSpec("get_claim_details", get_claim_details, require_selected_case),
+        ToolSpec("get_followup_guidance", get_followup_guidance, require_selected_case),
+        ToolSpec("get_document_guidance", get_document_guidance, require_selected_case),
         ToolSpec("send_summary_email", send_summary_email, require_email_consent),
         ToolSpec("escalate_to_human", escalate_to_human, require_not_escalated),
     ]

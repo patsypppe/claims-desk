@@ -12,4 +12,6 @@ class Responder(Protocol):
 
 class TemplateResponder:
     def respond(self, ctx: ResponseContext, turn: int) -> tuple[str, list[str], list[AuditEvent]]:
-        return render(ctx), [f.fact_id for f in ctx.facts], []
+        answer_ids = ctx.details.get("answer_ids")
+        cited = list(answer_ids) if answer_ids else [f.fact_id for f in ctx.facts]
+        return render(ctx), cited, []
