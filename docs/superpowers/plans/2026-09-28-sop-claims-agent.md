@@ -1333,25 +1333,25 @@ Judge: Empathy / Clarification / Naturalness (separate table)
 | Component | Current implementation | Required change | Reason | Dependencies | Tests | Metric affected | Status |
 |---|---|---|---|---|---|---|---|
 | Starter assessment | Fixtures only (6 JSON) | — | Baseline | — | — | — | DONE |
-| Repo/config/fixtures | None | Task 1 | Foundation, §26 | — | test_fixtures, test_config | — | NEXT |
-| Eval harness + baseline | None | Task 2 | Measure before building, §20/§22 | 1 | test_leak_detector, test_oracle_verifier | all | NEXT |
-| State + audit | None | Task 3 | §4, §17 | 1 | test_state, test_audit | Memory, leakage (logs) | NEXT |
-| Tool registry/guard | None | Task 4 | §15, Principle 4 | 1, 3 | test_permissions | Unauthorized tool | NEXT |
-| Normalizers + verifier | None | Task 5 | §3 hard gate | 1, 3 | test_verification | Bypass, gate compliance | NEXT |
-| Rule extractor + schema | None | Task 6 | §3, §14 | 3, 5 | test_rule_extractor | Extraction, memory | NEXT |
-| LLM extraction + merge | None | Task 7 | §4, §14, §12 | 6 | test_merge, test_llm_client | Memory, injection | NEXT |
-| Controller + agent | None | Task 8 | §2 | 3–7 | test_controller, e2e | Phase transitions | NEXT |
-| Case resolver | None | Task 9 | §5 | 8 | test_intent | Intent/case accuracy | NEXT |
-| Grounding + guidance | Data only | Task 10 | §6, fixture traps | 1 | test_grounding | Grounded, hallucination | NEXT |
-| Context + responder | None | Task 11 | §6, §13 | 9, 10 | test_context | Grounded, naturalness | NEXT |
-| Validator | None | Task 12 | §16 | 11 | test_validator, leaky e2e | Leakage | NEXT |
-| Scope/escalation/refusal | None | Task 13 | §8, §10, §11 | 8 | test_scope_escalation | Scope, escalation acc | NEXT |
-| Emotion + representative | Data only (reps, consent) | Task 14 | §9, D4 | 13 | test_emotion, test_representative | Empathy, bypass | NEXT (D4 ⚑) |
-| Post-process/email | None | Task 15 | §7 | 12 | test_post_process | Email consent | NEXT |
-| Red team + sessions | None | Task 16 | §12, §21 | 8–15 | redteam suite | All hard metrics | NEXT |
-| API + UI + panel | None | Task 17 | §17, §27 | 8 | test_api, screenshots | UI | NEXT |
-| Docker + README | None | Task 18 | §28, §29 | 17 | clean-clone run | — | NEXT |
-| Final eval | None | Task 19 | §33 | all | full suite | all | NEXT |
+| Repo/config/fixtures | None | Task 1 | Foundation, §26 | — | test_fixtures, test_config | — | DONE |
+| Eval harness + baseline | None | Task 2 | Measure before building, §20/§22 | 1 | test_leak_detector, test_oracle_verifier | all | DONE |
+| State + audit | None | Task 3 | §4, §17 | 1 | test_state, test_audit | Memory, leakage (logs) | DONE |
+| Tool registry/guard | None | Task 4 | §15, Principle 4 | 1, 3 | test_permissions | Unauthorized tool | DONE |
+| Normalizers + verifier | None | Task 5 | §3 hard gate | 1, 3 | test_verification | Bypass, gate compliance | DONE |
+| Rule extractor + schema | None | Task 6 | §3, §14 | 3, 5 | test_rule_extractor | Extraction, memory | DONE |
+| LLM extraction + merge | None | Task 7 | §4, §14, §12 | 6 | test_merge, test_llm_client | Memory, injection | DONE |
+| Controller + agent | None | Task 8 | §2 | 3–7 | test_controller, e2e | Phase transitions | DONE |
+| Case resolver | None | Task 9 | §5 | 8 | test_intent | Intent/case accuracy | DONE |
+| Grounding + guidance | Data only | Task 10 | §6, fixture traps | 1 | test_grounding | Grounded, hallucination | DONE |
+| Context + responder | None | Task 11 | §6, §13 | 9, 10 | test_context | Grounded, naturalness | DONE |
+| Validator | None | Task 12 | §16 | 11 | test_validator, leaky e2e | Leakage | DONE |
+| Scope/escalation/refusal | None | Task 13 | §8, §10, §11 | 8 | test_scope_escalation | Scope, escalation acc | DONE |
+| Emotion + representative | Data only (reps, consent) | Task 14 | §9, D4 | 13 | test_emotion, test_representative | Empathy, bypass | DONE |
+| Post-process/email | None | Task 15 | §7 | 12 | test_post_process | Email consent | DONE |
+| Red team + sessions | None | Task 16 | §12, §21 | 8–15 | redteam suite | All hard metrics | DONE |
+| API + UI + panel | None | Task 17 | §17, §27 | 8 | test_api, screenshots | UI | DONE |
+| Docker + README | None | Task 18 | §28, §29 | 17 | clean-clone run | — | DONE |
+| Final eval | None | Task 19 | §33 | all | full suite | all | DONE |
 | Multilingual guidance (`en` keys) | — | — | Only `en` data exists | — | — | — | DEFERRED |
 | Real email / CRM handoff | — | — | Mocks only, per spec | — | — | — | DEFERRED |
 | Persistent storage (Redis/DB) | — | — | In-memory is fine for the demo | — | — | — | DEFERRED |
@@ -1373,3 +1373,21 @@ Judge: Empathy / Clarification / Naturalness (separate table)
   - All the types those tests use are defined in *Canonical Interfaces*.
 - **Type consistency:** `Phase`, `ControllerAction`, `ConsentState`, `Fact`, `ToolResult`, `TurnAnalysis`, `ResponseContext`, `ResponderOutput`, `StateSnapshot` and `TurnResult` are used with the same names throughout.
 - **Review Focus:** all 5 items have a pinned test in their owning task.
+
+---
+
+## Final state (2026-09-28, after execution)
+
+**All 19 tasks are DONE**, on branch `feat/sop-claims-agent`. The history is in `docs/eval-log.md`. The rulings made during execution are in the executor ledger and repeated here:
+
+| Area | Actual implementation vs plan |
+|---|---|
+| Phase handlers | Split into `claims_agent/phases/{dispatch,verify,resolve,process,answers,post,representative}.py` (file-size rule). |
+| Order | Task 9 (resolver) ran before Task 8 (controller consumes it). |
+| Memory | `apply_analysis` returns `(state, conflicting_fields)`. A re-stated value without a cue also supersedes. `last_verification_key` prevents double-counting a failure. `pending_human_offer` makes "yes" after an offer escalate. |
+| Grounding | Follow-up matching uses bag-of-words scoring of `match_any` (the spec sample otherwise mis-routes). Answers are rendered from `answer_ids`. |
+| Validator | Checks atoms against all facts allowlisted for the turn; citations must be a subset. Strong status words are violations before verification even without a claim reference. |
+| Tool requests | LLM/caller requests now go *through* the registry, so the guard is the real control point (the `--no-guard` ablation shows it). |
+| Representatives | Consent is polled synchronously within the turn. A third party's own name is never a PII factor. |
+| Post-process | YES sends in the same turn. The 2nd ambiguous reply is a skip. Retracting after a send gets an honest "can't recall". |
+| Not done in this environment | Live-LLM and naive-baseline evals (no API key). `docker compose build` (daemon not running; a clean-clone run was verified instead). Playwright visual regression (checked manually in Chrome). |

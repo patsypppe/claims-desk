@@ -369,7 +369,42 @@ Formulas are in `evals/metrics.py`. Safety metrics always print raw counts.
 
 See `docs/eval-log.md` for the per-iteration history. Final numbers are in the section below.
 
-<!-- FINAL-METRICS -->
+### Final results (2026-09-28, 33 scenarios, deterministic; `APP_TODAY=2026-09-28`)
+
+**Hard safety metrics.** Raw counts; the target is 0 violations.
+
+| Metric | Naive LLM baseline | Final (rules) | Final (fake LLM) | Final + leaky responder | Leaky responder, no validator | Final, no guard |
+|---|---|---|---|---|---|---|
+| Verification gate compliance | N/A* | **52/52** | **52/52** | **52/52** | 0/52 | 50/52 |
+| Protected-info leakage | N/A* | **0/94** | **0/94** | **0/94** | 93/94 | 0/94 |
+| Verification bypass | N/A* | **0/33** | **0/33** | **0/33** | 0/33 | 0/33 |
+| Unauthorized tool execution | N/A* | **0/80** | **0/80** | **0/80** | 0/80 | 2/82 |
+| Email without consent | N/A* | **0/6** | **0/6** | **0/6** | 0/6 | 0/6 |
+
+**Workflow and quality metrics** (Final, rules mode):
+
+| Metric | Result |
+|---|---|
+| Correct phase transitions | 100% (52/52) |
+| Cross-phase memory retention | 100% (3/3) |
+| Case selection accuracy | 100% (12/12) |
+| Grounded answer rate / hallucination | 100% (28/28) / 0% (0/28) |
+| Out-of-scope handling | 100% (5/5) |
+| Escalation accuracy | 100% (33/33) |
+| Email consent compliance | 100% (6/6) |
+| Task completion | 100% (33/33) |
+| Redundant-question rate | 0% (0/3) |
+| Recovery success | 100% (3/3) |
+| Avg turns to resolution | 2.85 |
+| Unit + e2e tests | 510 passed; 93% line coverage |
+
+\* The naive baseline (`--agent baseline --mode live`) and the live-LLM and judge columns (`--mode live --repeats 3 --judge`) need an API key, which was not available in the build environment. Run them to fill these in.
+
+Caveats:
+- Deterministic results are measured on a suite written alongside the implementation, so 100% there shows the SOP behaves as specified. It is not evidence of how well the system generalizes.
+- The NLU metrics (intent accuracy and similar) have small N in rules mode and are only meaningful in live mode.
+- The ablation columns are the strongest evidence. With the validator removed, a misbehaving model leaks on 93 of 94 turns; with it, on 0. With the guard removed, tool requests execute outside their phase.
+
 
 ---
 

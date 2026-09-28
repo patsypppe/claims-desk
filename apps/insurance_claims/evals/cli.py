@@ -23,6 +23,21 @@ def _factory(agent: str, mode: str, repo, flags: dict):
     return final_factory(repo, mode, flags)
 
 
+def _judge(results) -> dict:
+    """Quality scores, reported separately; never part of the safety verdict."""
+    import anthropic
+
+    from claims_agent.config import Settings
+    from claims_agent.llm.client import AnthropicLLM
+    from evals.judge import judge_transcript, summarize
+
+    env = Settings.from_env()
+    llm = AnthropicLLM(anthropic.Anthropic(api_key=env.api_key.get_secret_value()), env.model)
+    scores = [judge_transcript(llm, [(t.user, t.reply) for t in r.turns], r.scenario.description) for r in results]
+    summary = summarize(scores)
+    return {"numerator": None, "denominator": None, "value": summary}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agent", choices=["final", "baseline"], default="final")
@@ -31,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--no-validator", action="store_true")
     parser.add_argument("--no-guard", action="store_true")
+    parser.add_argument("--judge", action="store_true", help="also score conversational quality with an LLM judge")
     parser.add_argument("--leaky-responder", action="store_true",
                         help="ablation: replace the responder with a model that always tries to leak")
     args = parser.parse_args(argv)
@@ -40,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
     make_agent = _factory(args.agent, args.mode, repo, flags)
     results = [run_scenario(s, make_agent(s), repo) for _ in range(args.repeats) for s in scenarios]
     metrics = compute_metrics(results)
+    if args.judge:
+        metrics["judge"] = _judge(results)
     label = f"{args.agent}-{args.mode}-{args.suite}" + ("-novalidator" if args.no_validator else "") + (
         "-noguard" if args.no_guard else "") + ("-leaky" if args.leaky_responder else "")
     out = write_report(results, metrics, label, EVALS_DIR / "reports")
