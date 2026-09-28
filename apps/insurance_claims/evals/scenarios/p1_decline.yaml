@@ -1,0 +1,12 @@
+id: p1_email_declined
+category: post_process
+description: Caller declines the summary; nothing sent.
+oracle_factors: {name: Margaret Chen, dob: "1985-03-15", id_last4: "4472"}
+expected_outcome: {terminal: COMPLETE, case_id: CL-2048, escalated: false}
+turns:
+  - user: "Margaret Chen, born March 15 1985, SSN ends in 4472. It's about my denied healthcare claim."
+    expect: {state: {selected_case_id: CL-2048}}
+  - user: "No, that's everything."
+    expect: {state: {phase: POST_PROCESS, consent: OFFERED}, tools_not_called: [send_summary_email]}
+  - user: "No thanks."
+    expect: {state: {phase: COMPLETE, consent: DECLINED}, tools_not_called: [send_summary_email]}

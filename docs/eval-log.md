@@ -71,3 +71,20 @@ One block per iteration: what changed, what ran, results, failures by category, 
 - **Tests:** 417 passed, 1 skipped.
 - **Eval (rules, 18 scenarios):** 17/18. Gate 27/27, leakage 0/45, bypass 0/18, unauthorized tools 0/41, email without consent 0/1.
 - **Remaining failure:** m1 turn 5 (email send), which is Task 15.
+
+## Iteration 6: post-processing (Task 15)
+
+- **Changes:**
+  - Deterministic email summary, built only from facts disclosed in the call. It includes the claim, status, reason on file, the documents still needed, the deadline status ("has already passed"), guidance discussed, the escalation reference and next steps.
+  - `build_summary` and `send_summary_email` tools. The recipient is always the on-file email, shown masked.
+  - Consent state machine:
+    - Only an explicit yes sends. Ambiguous replies are clarified; the 2nd ambiguous reply counts as a skip.
+    - Requests to use another address are refused.
+    - A send failure is never reported as sent, and gets one retry.
+    - Retracting after sending gets an honest "can't recall".
+- **New scenarios:** p1 decline, p2 ambiguous → yes, p3 retract after send, p4 provider failure, p6 caller-supplied address.
+- **Tests:** 450 passed. **The e2e suite now requires every scenario to fully pass.**
+- **Eval (rules, 23 scenarios):** **23/23.** Gate 27/27, leakage 0/64, bypass 0/23, unauthorized tools 0/70, email without consent 0/6. The Margaret Chen sample (m1) passes end to end.
+- **Found and fixed:**
+  - The validator's email action-claim pattern flagged "I can only *send* it to the address on file". It now counts only past tense.
+  - The truthful "the summary was already sent" was rejected because the CLOSE turn had no send-result fact. The fact is now re-attached.

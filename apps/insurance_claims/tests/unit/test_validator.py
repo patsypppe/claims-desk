@@ -125,3 +125,7 @@ def test_every_pre_verification_template_passes_validator(repo, validator):
 
 def test_offer_to_send_email_is_not_an_action_claim(validator, ctx_process):
     assert not ok(validator, "I've sent the summary email.", ctx_process)
+
+
+def test_offering_to_send_is_not_an_action_claim(validator, ctx_process):
+    assert ok(validator, "For your security I can only send it to the email address on file.", ctx_process)

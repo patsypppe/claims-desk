@@ -19,7 +19,7 @@ CLAIM_REF = re.compile(r"\b(claim|case|cl[-\s]?\d{4})", re.I)
 VERIFIED_CLAIM = re.compile(r"(?<!once )(?<!until )(?<!after )(?<!when )(?<!before )(?<!if )"
                             r"\byou(?:'re| are)\s+(?:now\s+)?(?:fully\s+)?verified\b", re.I)
 ACTION_CLAIMS = {
-    "tool.send_summary_email.result": re.compile(r"\bemailed\b|\b(sent|send)\b[^.!?]{0,40}\b(summary|e-?mail)\b|"
+    "tool.send_summary_email.result": re.compile(r"\bemailed\b|\bsent\b[^.!?]{0,40}\b(summary|e-?mail)\b|"
                                                  r"\b(summary|e-?mail)\b[^.!?]{0,30}\b(has been|was|is) sent\b", re.I),
     "tool.escalate_to_human.ticket": re.compile(r"\b(i'?ve|i have|has been|was)\s+(escalated|transferred)\b", re.I),
 }

@@ -164,13 +164,16 @@ RENDERERS = {
     A.PRESENT_CASE: _present,
     A.ANSWER: _answer,
     A.NOT_IN_DATA: _answer,
-    A.OFFER_EMAIL: lambda ctx: (f"Would you like me to email a summary of today's call to the address on file "
+    A.OFFER_EMAIL: lambda ctx: ((("For your security I can only send it to the email address on file. ")
+                                 if ctx.details.get("other_address_refused") else "")
+                                + f"Would you like me to email a summary of today's call to the address on file "
                                 f"({ctx.masked_email})? Just say yes to send it or no to skip it."),
     A.CLARIFY_CONSENT: lambda ctx: (f"Just to confirm: should I email the summary to {ctx.masked_email}? "
                                     "Please answer yes or no."),
     A.EMAIL_SENT: lambda ctx: f"Done. I've emailed the summary to {ctx.masked_email}. Thanks for calling!",
     A.EMAIL_FAILED: lambda ctx: ("I'm sorry, the summary email couldn't be sent just now, so nothing was sent. "
-                                 "Would you like me to try again?"),
+                                 + ("Please contact us later if you'd still like a copy. Thanks for calling."
+                                    if ctx.details.get("final") else "Would you like me to try again?")),
     A.EMAIL_SKIPPED: lambda ctx: "No problem, I won't send an email. Thanks for calling, and take care!",
     A.REDIRECT_SCOPE: lambda ctx: ("I can help with your insurance policy or claim, but I can't assist with that "
                                    "topic." + _resume(ctx)),
@@ -179,7 +182,9 @@ RENDERERS = {
     A.ESCALATE: _escalate,
     A.ESCALATED_HOLD: lambda ctx: ("A member of our team will pick this up from here, so I'm not able to continue "
                                    "on this line. Thank you for your patience."),
-    A.CLOSE: lambda ctx: "Thanks for calling. If you need anything else, please start a new conversation.",
+    A.CLOSE: lambda ctx: (("The summary was already sent, and I'm not able to recall an email once it has gone "
+                           "out. ") if ctx.details.get("already_sent") else "")
+                         + "Thanks for calling. If you need anything else, please start a new conversation.",
     A.REP_CONSENT_PENDING: lambda ctx: ("I've sent an authorization request to the policyholder's contact details "
                                         "on file. Once they approve it, I can continue."),
 }

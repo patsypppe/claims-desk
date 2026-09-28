@@ -80,6 +80,9 @@ class StepContext:
             state = state.model_copy(update={"pending_human_offer": details.get("offer_reason", "caller_request")})
         return Decision(state=state, action=action, emotion=self.emotion, events=tuple(self.events), **kw)
 
+    def consent_event(self, state: ConversationState, outcome: str) -> AuditEvent:
+        return AuditEvent(kind="consent", detail={"outcome": outcome, "offer_id": state.offer_id}, turn=state.turn)
+
     def escalate(self, state: ConversationState, reason: str) -> Decision:
         result = self.call("escalate_to_human", state, reason=reason)
         if not result.ok:

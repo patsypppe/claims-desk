@@ -1,6 +1,7 @@
 """Tool implementations. Identity scope always comes from state, never from arguments."""
 from claims_agent.audit import mask
 from claims_agent.grounding.facts import Fact, claim_detail_facts, claim_option_facts, derived_facts
+from claims_agent.grounding.summary import build_summary as assemble_summary
 from claims_agent.grounding.followup import document_guidance, fallback_guidance, select_followup
 from claims_agent.state import PII_FIELDS, ConversationState
 from claims_agent.representatives import listed_representative
@@ -101,6 +102,12 @@ def request_representative_consent(reg, state: ConversationState) -> ToolResult:
     return ToolResult(ok=status == "approved", data={"status": status, "party_id": outcome.party_id})
 
 
+def build_summary(reg, state: ConversationState) -> ToolResult:
+    summary = assemble_summary(reg.repo, state, reg.clock.today())
+    fact = Fact(fact_id="summary.body", label="summary", value=summary.body, display=summary.body)
+    return ToolResult(ok=True, facts=(fact,), data={"subject": summary.subject, "body": summary.body})
+
+
 def default_specs() -> list[ToolSpec]:
     return [
         ToolSpec("verify_identity", verify_identity),
@@ -109,6 +116,7 @@ def default_specs() -> list[ToolSpec]:
         ToolSpec("get_claim_details", get_claim_details, require_selected_case),
         ToolSpec("get_followup_guidance", get_followup_guidance, require_selected_case),
         ToolSpec("get_document_guidance", get_document_guidance, require_selected_case),
+        ToolSpec("build_summary", build_summary, require_verified),
         ToolSpec("send_summary_email", send_summary_email, require_email_consent),
         ToolSpec("escalate_to_human", escalate_to_human, require_not_escalated),
     ]

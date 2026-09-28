@@ -2,11 +2,14 @@
 from claims_agent.audit import AuditEvent
 from claims_agent.controller import ControllerAction as A
 from claims_agent.controller import Decision, StepContext
+from claims_agent.grounding.facts import Fact
 from claims_agent.phases import post, process, resolve, verify
 from claims_agent.policy.emotion import HEATED, strategy_for
 from claims_agent.policy.scope import decide_scope
 from claims_agent.state import ConversationState, Phase
 
+SENT_FACT = Fact(fact_id="tool.send_summary_email.result", label="email_sent", value="sent",
+                 display="summary already emailed")
 HANDLERS = {
     Phase.VERIFY_ID: verify.handle,
     Phase.RESOLVE_INTENT: resolve.handle,
@@ -32,7 +35,9 @@ def run(ctx: StepContext, state: ConversationState) -> Decision:
     if state.phase == Phase.ESCALATED:
         return ctx.decide(state, A.ESCALATED_HOLD)
     if state.phase == Phase.COMPLETE:
-        return ctx.decide(state, A.CLOSE)
+        retract = state.email_sent and analysis.consent_signal == "NO"
+        facts = (SENT_FACT,) if retract else ()
+        return ctx.decide(state, A.CLOSE, details={"already_sent": retract}, facts=facts)
     _guard_tool_requests(ctx, state)
     offer, state = state.pending_human_offer, state.model_copy(update={"pending_human_offer": None})
     if analysis.requested_action == "request_human":
