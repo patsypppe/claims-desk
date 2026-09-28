@@ -85,7 +85,7 @@ def escalate_to_human(reg, state: ConversationState, reason: str = "unspecified"
     }
     ticket_id = reg.handoff.create(payload)
     fact = Fact(fact_id="tool.escalate_to_human.ticket", label="ticket_id", value=ticket_id,
-                display=f"reference {ticket_id}")
+                display=ticket_id)
     return ToolResult(ok=True, facts=(fact,), data={"ticket_id": ticket_id, "reason": reason})
 
 

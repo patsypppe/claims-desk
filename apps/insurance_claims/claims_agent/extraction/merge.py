@@ -87,11 +87,23 @@ def _merge_consent(rules: str, llm: str) -> str:
     return "AMBIGUOUS" if "NONE" not in (rules, llm) or "AMBIGUOUS" in (rules, llm) else rules
 
 
-def _merge_action(rules: str, llm: str) -> str:
-    for action in ("request_human", "request_other_email", "done"):
-        if action in (rules, llm):
-            return action
-    return llm if llm != "provide_info" else rules
+PERSON_WORD_RE = re.compile(r"\b(human|person|people|someone|somebody|agent|representative|rep|manager|supervisor|"
+                            r"operator|staff|team member|colleague|real person)\b", re.I)
+EMAIL_EVIDENCE_RE = re.compile(r"[\w.+-]+@[\w-]+\.|\b(other|different|another|new|work|personal) (e-?mail|address)\b",
+                               re.I)
+
+
+def _merge_action(rules: str, llm: str, text: str, injection: bool) -> str:
+    """High-impact actions need deterministic corroboration; an LLM label alone never escalates or re-routes."""
+    if "request_human" == rules or (llm == "request_human" and not injection and PERSON_WORD_RE.search(text)):
+        return "request_human"
+    if "request_other_email" == rules or (llm == "request_other_email" and EMAIL_EVIDENCE_RE.search(text)):
+        return "request_other_email"
+    if rules == "done" or (llm == "done" and "?" not in text):
+        return "done"
+    if llm in ("provide_info", "ask_question", "other"):
+        return rules if rules in ("provide_info", "ask_question") else llm
+    return rules
 
 
 def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: date,
@@ -105,6 +117,12 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
     intent = _merge_intent(rules.intent, llm.intent, text, turn, events)
     relationship = rules.stated_relationship or (
         llm.stated_relationship if _in_text(llm.stated_relationship, text) else None)
+    speaker = rules.speaker_name or (llm.speaker_name if _in_text(llm.speaker_name, text) else None)
+    if speaker:  # a third-party caller's own name is never the policyholder's name factor
+        from claims_agent.normalize import name_tokens
+        pii = [c for c in pii if c.field != "name" or c.caller_refused or name_tokens(c.raw_value) != name_tokens(speaker)]
+        if rules.stated_subject_name and not any(c.field == "name" and not c.caller_refused for c in pii):
+            pii.append(PiiCandidate(field="name", raw_value=rules.stated_subject_name))
     merged = TurnAnalysis(
         pii_candidates=pii, policy_number=policy, intent=intent,
         speaker_role="third_party" if "third_party" in (rules.speaker_role, llm.speaker_role)
@@ -114,10 +132,11 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
             llm.stated_subject_relation if _in_text(llm.stated_subject_relation, text) else None),
         stated_subject_name=rules.stated_subject_name or (
             llm.stated_subject_name if _in_text(llm.stated_subject_name, text) else None),
-        speaker_name=rules.speaker_name or (llm.speaker_name if _in_text(llm.speaker_name, text) else None),
+        speaker_name=speaker,
         scope=llm.scope, emotion=llm.emotion,
         consent_signal=_merge_consent(rules.consent_signal, llm.consent_signal),
-        requested_action=_merge_action(rules.requested_action, llm.requested_action),
+        requested_action=_merge_action(rules.requested_action, llm.requested_action, text,
+                                       rules.injection_suspected or llm.injection_suspected),
         tool_requests=rules.tool_requests + [t for t in llm.tool_requests
                                              if t.name not in {r.name for r in rules.tool_requests}],
         injection_suspected=rules.injection_suspected or llm.injection_suspected,

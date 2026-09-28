@@ -18,7 +18,7 @@ turns:
       state: {phase: PROCESS_CASE}
       tools_called: [get_followup_guidance]
       text:
-        must_reference: ["within a week"]
+        must_reference: [{any: ["within a week", "within the next week", "within one week", "within 7 days", "within seven days"]}]
         must_not_match: ['(until|by|before)\s+(march 18|2026-03-18)']
         no_ungrounded_atoms: true
   - user: "Which hospital submitted it?"

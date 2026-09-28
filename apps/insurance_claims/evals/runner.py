@@ -71,11 +71,18 @@ def _tool_names(events: list[dict], kind: str) -> list[str]:
     return [e["detail"].get("tool") for e in events if e["kind"] == kind]
 
 
+TYPOGRAPHIC = str.maketrans({"\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"', "\u2014": "-", "\u2013": "-"})
+
+
+def _plain(text: str) -> str:
+    return text.translate(TYPOGRAPHIC).lower()
+
+
 def _reference_ok(item: Any, reply: str) -> bool:
-    low = reply.lower()
+    low = _plain(reply)
     if isinstance(item, dict) and "any" in item:
-        return any(str(x).lower() in low for x in item["any"])
-    return str(item).lower() in low
+        return any(_plain(str(x)) in low for x in item["any"])
+    return _plain(str(item)) in low
 
 
 def _check_tools(exp, events: list[dict], fail: Callable[[str], None]) -> None:
@@ -99,10 +106,10 @@ def _check_text(exp, reply: str, snapshot: dict, fail: Callable[[str], None]) ->
         if not _reference_ok(item, reply):
             fail(f"reply must reference {item!r}")
     for pattern in exp.text.must_not_match:
-        if re.search(pattern, reply, re.I):
+        if re.search(pattern, _plain(reply), re.I):
             fail(f"reply must not match {pattern!r}")
     for phrase in exp.text.must_not_reference:
-        if phrase.lower() in reply.lower():
+        if _plain(phrase) in _plain(reply):
             fail(f"reply must not reference {phrase!r}")
     if exp.text.asks_for_any and snapshot.get("expected_field") not in exp.text.asks_for_any:
         fail(f"expected to ask for one of {exp.text.asks_for_any}, asked {snapshot.get('expected_field')}")

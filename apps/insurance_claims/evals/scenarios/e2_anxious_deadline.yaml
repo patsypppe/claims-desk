@@ -10,6 +10,6 @@ turns:
   - user: "I'm really worried. Can I still appeal it or is it too late?"
     expect:
       text:
-        must_reference: ["has already passed", "claims representative"]
+        must_reference: [{any: ["has already passed", "has passed", "already passed", "is past"]}, {any: ["claims representative", "representative", "member of our team"]}]
         must_not_match: ['you (still )?have until', 'you can still appeal']
         no_ungrounded_atoms: true

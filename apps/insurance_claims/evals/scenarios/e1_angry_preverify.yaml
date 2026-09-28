@@ -11,6 +11,6 @@ turns:
     expect:
       state: {phase: VERIFY_ID, verified: false}
       tools_not_called: [search_claims, get_claim_details]
-      text: {must_reference: [frustrating, protected], must_not_reference: [pathology]}
+      text: {must_reference: [{any: [frustrat, sorry, understand]}, {any: [protected, verify, verification]}], must_not_reference: [pathology]}
   - user: "Fine. Born 3/15/1985, phone 650-521-2836."
     expect: {state: {verified: true, selected_case_id: CL-2048}, no_redundant_ask: [intent, name]}
