@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claims Desk</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%228%22 fill=%22%231f4f46%22/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">§</span>
+      <div>
+        <h1>Claims Desk</h1>
+        <p class="tagline">SOP-controlled support agent · the controller enforces, the model converses</p>
+      </div>
+    </div>
+    <div class="masthead-actions">
+      <span class="mode-badge" id="mode-badge">mode: …</span>
+      <button type="button" class="btn-ghost" id="reset-btn">New conversation</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="chat" aria-labelledby="chat-heading">
+      <h2 id="chat-heading" class="visually-hidden">Conversation</h2>
+      <ol class="transcript" id="transcript" aria-live="polite" aria-relevant="additions"></ol>
+      <form class="composer" id="composer" autocomplete="off">
+        <label for="message" class="visually-hidden">Your message</label>
+        <textarea id="message" name="message" rows="2" maxlength="2000"
+                  placeholder="Try: I'm Margaret Chen, calling about my denied healthcare claim from January…"></textarea>
+        <button type="submit" class="btn-send" id="send-btn">Send</button>
+      </form>
+      <p class="hint">Enter to send · Shift+Enter for a new line · demo data only</p>
+    </section>
+
+    <aside class="sop" id="sop-panel" aria-labelledby="sop-heading">
+      <h2 id="sop-heading" class="sop-title">SOP control <span class="sop-sub">authoritative state, not the model's opinion</span></h2>
+
+      <ol class="phase-rail" id="phase-rail" aria-label="Workflow phase">
+        <li data-phase="VERIFY_ID">Verify ID</li>
+        <li data-phase="RESOLVE_INTENT">Resolve intent</li>
+        <li data-phase="PROCESS_CASE">Process case</li>
+        <li data-phase="POST_PROCESS">Post-process</li>
+        <li data-phase="COMPLETE">Complete</li>
+      </ol>
+      <p class="escalation-banner" id="escalation-banner" hidden></p>
+
+      <div class="panel-grid">
+        <section class="card card-verify">
+          <h3>Identity gate</h3>
+          <div class="meter" aria-hidden="true"><span id="meter-fill"></span></div>
+          <p class="meter-label" id="verify-status">0 of 3 factors captured</p>
+          <dl class="kv" id="captured-fields"></dl>
+        </section>
+
+        <section class="card">
+          <h3>Remembered intent</h3>
+          <dl class="kv" id="intent-hints"></dl>
+          <p class="note">Captured early, used only once the gate opens.</p>
+        </section>
+
+        <section class="card">
+          <h3>Case &amp; consent</h3>
+          <dl class="kv" id="case-consent"></dl>
+        </section>
+
+        <section class="card card-counters">
+          <h3>Counters</h3>
+          <dl class="kv" id="counters"></dl>
+        </section>
+      </div>
+
+      <section class="card card-log">
+        <h3>Tool &amp; guard activity <span class="legend"><i class="dot ok"></i>allowed <i class="dot blocked"></i>blocked</span></h3>
+        <ol class="event-log" id="event-log"></ol>
+      </section>
+    </aside>
+  </main>
+</body>
+</html>
