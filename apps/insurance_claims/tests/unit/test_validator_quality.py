@@ -44,3 +44,7 @@ def test_hhem_wrapper_is_optional():
     from evals.hhem import grounding_score
     score = grounding_score(["Claim CL-2048 was denied."], "Your claim was denied.")
     assert score is None or 0.0 <= score <= 1.0
+
+
+def test_conditional_promise_rejected(v, ctx):
+    assert not v.validate("If you send the documents this week, your claim will be approved.", [], ctx, "").ok

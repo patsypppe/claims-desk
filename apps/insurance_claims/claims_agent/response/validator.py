@@ -39,8 +39,7 @@ PROMISSORY_RE = re.compile(
     r"(?:will|is going to) go through|you'?ll (?:definitely |certainly )?(?:be reimbursed|get paid|get your money))", re.I)
 NEGATION_RE = re.compile(r"(can'?t|cannot|can not|won'?t|not able to|unable to) (?:promise|guarantee)|"
                          r"\bno guarantee|isn'?t guaranteed|not guaranteed|\bnot (?:be )?(?:approved|paid)|"
-                         r"nothing (?:will be|has been|was) paid|\bnot\b[^.]{0,20}\bwill be\b|"
-                         r"\bif\b[^.]{0,60}\b(?:will|should) be", re.I)
+                         r"nothing (?:will be|has been|was) paid|\bnot\b[^.]{0,20}\bwill be\b", re.I)
 PAID_NEGATION_RE = re.compile(r"(nothing|not|n'?t|never|no (?:money|payment)) (?:\w+ ){0,2}paid", re.I)
 
 
