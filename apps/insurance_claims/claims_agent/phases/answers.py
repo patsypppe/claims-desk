@@ -33,7 +33,8 @@ def _guidance(ctx: StepContext, state: ConversationState, claim_facts, deadline:
     result = ctx.call("get_followup_guidance", state, topic=intent.topic, text=ctx.text,
                       followup_topic=intent.followup_topic)
     if result.ok and result.data.get("topic") != "fallback":
-        extra = deadline if intent.topic in DEADLINE_TOPICS and deadline and deadline[0].value == "passed" else []
+        fresh = deadline and deadline[0].fact_id not in state.disclosed_fact_ids  # don't repeat the caveat
+        extra = deadline if intent.topic in DEADLINE_TOPICS and fresh and deadline[0].value == "passed" else []
         return list(result.facts) + extra
     if intent.documents_mentioned:
         doc = ctx.call("get_document_guidance", state, document=intent.documents_mentioned[0])
@@ -66,4 +67,6 @@ def answer(ctx: StepContext, state: ConversationState, claim_facts: tuple[Fact, 
     details = {"answer_ids": [f.fact_id for f in chosen], "offer_human": False}
     if any(f.label == "appeal_deadline_status" and f.value == "passed" for f in chosen):
         details["implicit_offer"] = "deadline_review"
+        if intent.asked_attribute == "deadline" or intent.topic == "appeal_question":
+            details["offer_is_answer"] = True  # "can I still appeal?" -> the representative IS the answer
     return ctx.decide(state, A.ANSWER, facts=claim_facts + extra, details=details)

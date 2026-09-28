@@ -60,8 +60,7 @@ def derived_facts(claim: Claim, today) -> tuple[Fact, ...]:
     days = (claim.appeal_deadline - today).days
     if days < 0:
         display = (f"The appeal deadline on file for this claim was {_long_date(claim.appeal_deadline)}, which has "
-                   "already passed, so I can't promise that a late submission will be accepted. A claims "
-                   "representative can review your options if you'd like.")
+                   "already passed, so I can't promise that a late submission will be accepted.")
         return (Fact(fact_id=f"{base}.appeal_deadline_status", label="appeal_deadline_status", value="passed",
                      display=display),)
     display = (f"The appeal deadline on file is {_long_date(claim.appeal_deadline)}, which is {days} days from "

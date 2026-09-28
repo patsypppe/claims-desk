@@ -85,7 +85,11 @@ class StepContext:
         offers_human = details.get("offer_human") or self.emotion.offer_human or details.get("implicit_offer")
         if offers_human and state.phase not in (Phase.ESCALATED, Phase.COMPLETE, Phase.POST_PROCESS):
             reason = details.get("offer_reason") or details.get("implicit_offer") or "caller_request"
-            state = state.model_copy(update={"pending_human_offer": reason})
+            first_time = reason not in state.offers_made  # say each offer once; it stays open afterwards
+            state = state.model_copy(update={"pending_human_offer": reason,
+                                             "offers_made": state.offers_made | {reason}})
+            details = {**details, "make_offer": first_time}
+            kw["details"] = details
         return Decision(state=state, action=action, emotion=self.emotion, events=tuple(self.events), **kw)
 
     def consent_event(self, state: ConversationState, outcome: str) -> AuditEvent:

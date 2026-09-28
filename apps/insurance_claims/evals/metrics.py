@@ -74,7 +74,16 @@ def compute_metrics(results: list[ScenarioResult]) -> dict:
         "llm_degraded_turns": _ratio(sum(1 for t in turns if _kinds(t) & {"llm_degraded"}), len(turns)),
         "validator_rejections": _count(turns, "validator_reject"),
         "template_fallbacks": _count(turns, "fallback_used"),
+        "quality": {"numerator": None, "denominator": None, "value": _quality(results)},
     }
+
+
+def _quality(results) -> dict:
+    from evals.quality import conversation_quality, summarize_quality
+
+    return summarize_quality([conversation_quality([t.reply for t in r.turns],
+                                                   [t.snapshot.get("emotion", "neutral") for t in r.turns])
+                              for r in results if r.turns])
 
 
 def _kinds(turn) -> set[str]:

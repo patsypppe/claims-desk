@@ -145,7 +145,8 @@ class Agent:
         reply, cited, respond_events = self._respond(ctx, text, state.turn)
         final = decision.state.model_copy(update={
             "disclosed_fact_ids": tuple(dict.fromkeys(decision.state.disclosed_fact_ids + tuple(cited))),
-            "last_reply": reply, "last_authorized_values": authorized_values(ctx)})
+            "last_reply": reply, "last_authorized_values": authorized_values(ctx),
+            "recent_replies": (decision.state.recent_replies + (reply,))[-3:]})
         self.sessions.save(final)
         all_events = tuple(events) + decision.events + tuple(respond_events)
         return TurnResult(reply=reply, snapshot=snapshot(final), events=all_events,

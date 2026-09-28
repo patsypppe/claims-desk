@@ -45,7 +45,10 @@ def run(ctx: StepContext, state: ConversationState) -> Decision:
             update={"manipulation_attempts": attempts})})
     heated = state.counters.heated_turns + (1 if analysis.emotion.label in HEATED else 0)
     state = state.model_copy(update={"counters": state.counters.model_copy(update={"heated_turns": heated})})
-    ctx.emotion = strategy_for(analysis.emotion.label, analysis.emotion.intensity, heated)
+    previous_emotion = state.last_emotion
+    state = state.model_copy(update={"last_emotion": analysis.emotion.label})
+    ctx.emotion = strategy_for(analysis.emotion.label, analysis.emotion.intensity, heated,
+                               already_acknowledged=previous_emotion == analysis.emotion.label)
     if analysis.social_engineering and not state.verification.verified:
         ctx.emotion = strategy_for("distrust", "medium", 0)  # explain why the protection exists
     if state.phase == Phase.ESCALATED:

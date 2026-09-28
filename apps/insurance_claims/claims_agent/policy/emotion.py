@@ -31,9 +31,13 @@ STEPS: dict[str, tuple[Step, ...]] = {
 HUMAN_OFFER_REPEATS = 2
 
 
-def strategy_for(label: str, intensity: str, repeat_count: int) -> EmotionStrategy:
+def strategy_for(label: str, intensity: str, repeat_count: int,
+                 already_acknowledged: bool = False) -> EmotionStrategy:
     if label not in STEPS:
         return NEUTRAL
     offer = label in HEATED and (intensity == "high" or repeat_count >= HUMAN_OFFER_REPEATS)
-    return EmotionStrategy(label=label, intensity=intensity, steps=STEPS[label], offer_human=offer,
-                           max_sentences=3 if label == "confusion" else 5)
+    steps = STEPS[label]
+    if already_acknowledged:  # acknowledge once per emotional streak; repeating it reads as scripted
+        steps = tuple(s for s in steps if s not in ("acknowledge", "empathize", "reassure"))
+    return EmotionStrategy(label=label, intensity=intensity, steps=steps or ("return_to_action",), offer_human=offer,
+                           max_sentences=3 if label == "confusion" else 4)

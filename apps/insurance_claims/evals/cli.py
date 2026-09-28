@@ -23,12 +23,23 @@ def _factory(agent: str, mode: str, repo, flags: dict):
     return final_factory(repo, mode, flags)
 
 
+def judge_model_name(provider: str, reply_model: str) -> str:
+    """Judge on a different model/quota than the reply model (also avoids self-preference bias)."""
+    import os
+
+    return os.environ.get("JUDGE_MODEL") or ("qwen/qwen3.8-27b" if provider == "groq" else reply_model)
+
+
 def _judge(results) -> dict:
     """Quality scores, reported separately; never part of the safety verdict."""
-    from evals.agents import live_llm
+    from dataclasses import replace
+
+    from claims_agent.agent import llm_clients
+    from claims_agent.config import Settings
     from evals.judge import judge_transcript, summarize
 
-    llm = live_llm()
+    settings = Settings.from_env()
+    llm = llm_clients(replace(settings, model=judge_model_name(settings.provider, settings.model)))[1]
     scores = [judge_transcript(llm, [(t.user, t.reply) for t in r.turns], r.scenario.description) for r in results]
     summary = summarize(scores)
     return {"numerator": None, "denominator": None, "value": summary}

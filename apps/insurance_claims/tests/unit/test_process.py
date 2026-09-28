@@ -31,7 +31,7 @@ def test_present_mentions_passed_deadline(agent):
 def test_timing_question_uses_followup_guidance(agent):
     [r] = ask(agent, "What do I need to send and how soon?")
     assert "get_followup_guidance" in tools(r) and "within a week" in r.reply
-    assert "has already passed" in r.reply
+    assert "has already passed" not in r.reply  # disclosed on the previous turn; not repeated (quality)
 
 
 def test_processing_time(agent):

@@ -100,6 +100,9 @@ class ConversationState(FrozenModel):
     otp_pending: bool = False
     last_reply: str | None = None
     last_authorized_values: tuple[str, ...] = ()
+    last_emotion: str = "neutral"
+    recent_replies: tuple[str, ...] = ()
+    offers_made: frozenset[str] = frozenset()
     channel_token: str | None = None  # untrusted until accept_channel_assertion verifies it; never in snapshots
     awaiting_anything_else: bool = False
     last_verification_key: str | None = None
@@ -134,6 +137,7 @@ class StateSnapshot(FrozenModel):
     escalation_ticket: str | None
     expected_field: str | None
     degraded: bool
+    emotion: str = "neutral"
 
 
 def snapshot(state: ConversationState) -> StateSnapshot:
@@ -151,5 +155,5 @@ def snapshot(state: ConversationState) -> StateSnapshot:
         counters=state.counters.model_dump(), consent=state.consent,
         escalated=state.escalation.active, escalation_reason=state.escalation.reason,
         escalation_ticket=state.escalation.ticket_id,
-        expected_field=state.expected_field, degraded=state.degraded,
+        expected_field=state.expected_field, degraded=state.degraded, emotion=state.last_emotion,
     )

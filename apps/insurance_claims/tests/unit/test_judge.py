@@ -12,3 +12,16 @@ def test_judge_failure_is_none_and_excluded_from_summary():
     assert judge_transcript(FakeLLM([None]), [("a", "b")], "none") is None
     summary = summarize([JudgeScores(empathy=4, clarification=2, naturalness=5, rationale=""), None])
     assert summary == {"empathy": 4.0, "clarification": 2.0, "naturalness": 5.0, "judged": 1, "failed": 1}
+
+
+def test_judge_prompt_has_anchored_examples_per_dimension():
+    from evals.judge import JUDGE_PROMPT
+    assert JUDGE_PROMPT.count("Example") >= 3 and "score 5" in JUDGE_PROMPT and "score 2" in JUDGE_PROMPT
+
+
+def test_judge_model_defaults_off_the_reply_model(monkeypatch):
+    from evals.cli import judge_model_name
+    monkeypatch.delenv("JUDGE_MODEL", raising=False)
+    assert judge_model_name("groq", "openai/gpt-oss-120b") == "qwen/qwen3.8-27b"
+    monkeypatch.setenv("JUDGE_MODEL", "openai/gpt-oss-20b")
+    assert judge_model_name("groq", "openai/gpt-oss-120b") == "openai/gpt-oss-20b"

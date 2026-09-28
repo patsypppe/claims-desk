@@ -66,18 +66,31 @@ def _verified_prefix(ctx: ResponseContext) -> str:
     return f"Thank you{', ' + ctx.caller_first_name if ctx.caller_first_name else ''}, you're verified. "
 
 
+SHORT_REMINDERS = ("I'll need to verify you before I can look anything up.",
+                   "Once you're verified I can go through the claim with you.",
+                   "I can share that as soon as verification is done.")
+
+
+def _said_before(ctx: ResponseContext, phrase: str) -> bool:
+    return any(phrase.lower() in r.lower() for r in ctx.previous_agent_replies)
+
+
 def _ask_fields(ctx: ResponseContext) -> str:
     field = ctx.required_elements[0] if ctx.required_elements else None
     if field not in FIELD_LABELS:
         return GENERIC_FAILURE
     parts = []
     if ctx.details.get("protected_request"):
-        parts.append(PROTECTED_EXPLANATION)
+        explained = _said_before(ctx, PROTECTED_EXPLANATION)
+        parts.append(SHORT_REMINDERS[len(ctx.previous_agent_replies) % len(SHORT_REMINDERS)] if explained
+                     else PROTECTED_EXPLANATION)
     if ctx.details.get("for_policyholder"):
         return (f"To help on the policyholder's behalf, I need to verify their identity first. Could you give me "
                 f"the policyholder's {FIELD_LABELS[field].replace('your ', '').replace('the ', '')}? I'll need three "
                 "of their details in total, and the policyholder will be asked to approve your access.")
-    if ctx.details.get("captured", 0) == 0:
+    if ctx.details.get("captured", 0) == 0 and _said_before(ctx, "three identifying details"):
+        parts.append(f"Could you start with {FIELD_LABELS[field]}?")
+    elif ctx.details.get("captured", 0) == 0:
         parts.append(f"To get started, could you give me {FIELD_LABELS[field]}? I'll need three identifying "
                      "details in total, such as your full name, date of birth, and the last four digits of your "
                      "SSN or national ID.")
@@ -98,12 +111,15 @@ def _present(ctx: ResponseContext) -> str:
         parts.append("I didn't find a claim from the month you mentioned, but this looks like the closest match. ")
     parts.append(f"I found your {_fact(ctx, 'case_type')} claim {_fact(ctx, 'case_id')} from "
                  f"{_fact(ctx, 'created_at')}. Its current status is {_fact(ctx, 'status')}.")
-    if reason := _fact(ctx, "denial_reason"):
+    reason = _fact(ctx, "denial_reason")
+    if reason:
         parts.append(f" The denial reason on file is that {reason}.")
-    if docs := _facts(ctx, "document_needed"):
+    docs = _facts(ctx, "document_needed")
+    if docs and not all(d.lower() in (reason or "").lower() for d in docs):  # don't list documents twice
         parts.append(f" To have it reconsidered, the reviewer needs the {join_list(docs)}.")
     if deadline := _fact(ctx, "appeal_deadline_status"):
         parts.append(f" {deadline}")
+    parts.append(_offer(ctx))
     parts.append(" What would you like to know about it?")
     return "".join(parts)
 
@@ -124,11 +140,26 @@ def _sentences(ctx: ResponseContext) -> list[str]:
     return lines
 
 
+CLOSERS = ("Anything else on this claim?", "Is there anything else I can help with?",
+           "What else would you like to know?")
+
+
+def _offer(ctx: ResponseContext) -> str:
+    if not ctx.details.get("implicit_offer"):
+        return ""
+    if ctx.details.get("make_offer"):
+        return " A claims representative can review your options if you'd like."
+    if ctx.details.get("offer_is_answer"):
+        return " A claims representative can look at whether any options remain. Would you like me to connect you?"
+    return ""
+
+
 def _answer(ctx: ResponseContext) -> str:
     lines = _sentences(ctx) or [f"Claim {_fact(ctx, 'case_id')} is currently {_fact(ctx, 'status')}."]
     if ctx.details.get("offer_human"):
         return " ".join(lines) + " Would you like me to connect you with a claims representative?"
-    return " ".join(lines) + " Is there anything else I can help you with on this claim?"
+    closer = CLOSERS[len(ctx.previous_agent_replies) % len(CLOSERS)]
+    return " ".join(lines) + _offer(ctx) + " " + closer
 
 
 def _escalate(ctx: ResponseContext) -> str:
