@@ -56,3 +56,42 @@ def test_bad_threshold_rejected(monkeypatch):
     monkeypatch.setenv("MAX_VERIFICATION_ATTEMPTS", "zero")
     with pytest.raises(ConfigError, match="MAX_VERIFICATION_ATTEMPTS"):
         Settings.from_env()
+
+
+@pytest.fixture
+def no_provider_env(monkeypatch):
+    for key in ("AI_PROVIDER", "GROQ_API_KEY", "AI_EXTRACTION_MODEL"):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_groq_provider_defaults(monkeypatch, no_provider_env):
+    monkeypatch.setenv("AGENT_MODE", "llm")
+    monkeypatch.setenv("AI_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
+    s = Settings.from_env()
+    assert s.provider == "groq" and s.model == "openai/gpt-oss-120b" and s.api_key.get_secret_value() == "gsk-test"
+
+
+def test_groq_without_key_names_groq_variable(monkeypatch, no_provider_env):
+    monkeypatch.setenv("AGENT_MODE", "llm")
+    monkeypatch.setenv("AI_PROVIDER", "groq")
+    with pytest.raises(ConfigError, match="GROQ_API_KEY"):
+        Settings.from_env()
+
+
+def test_unknown_provider_rejected(monkeypatch, no_provider_env):
+    monkeypatch.setenv("AGENT_MODE", "rules")
+    monkeypatch.setenv("AI_PROVIDER", "mystery")
+    with pytest.raises(ConfigError, match="AI_PROVIDER"):
+        Settings.from_env()
+
+
+def test_dotenv_loaded_without_overriding_real_env(monkeypatch, tmp_path, no_provider_env):
+    from claims_agent.config import load_dotenv
+    (tmp_path / ".env").write_text("# comment\nAI_PROVIDER=groq\nAGENT_MODE=rules\nQUOTED='x y'\n")
+    monkeypatch.setenv("AGENT_MODE", "llm")
+    monkeypatch.delenv("QUOTED", raising=False)
+    load_dotenv(tmp_path / ".env")
+    import os
+    assert os.environ["AI_PROVIDER"] == "groq" and os.environ["AGENT_MODE"] == "llm" and os.environ["QUOTED"] == "x y"
+    monkeypatch.delenv("QUOTED")

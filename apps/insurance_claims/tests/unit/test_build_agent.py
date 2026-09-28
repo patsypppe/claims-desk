@@ -14,3 +14,10 @@ def test_rules_mode_uses_templates_only(repo):
 def test_llm_mode_wires_llm_responder_without_calling_api(repo):
     agent = build_agent(Settings(agent_mode="llm", api_key=SecretStr("sk-test")), repo)
     assert isinstance(agent.responder, LLMResponder) and agent.use_llm
+
+
+def test_groq_provider_wires_groq_clients(repo):
+    from claims_agent.llm.groq_client import GroqLLM
+    agent = build_agent(Settings(agent_mode="llm", provider="groq", api_key=SecretStr("gsk-test"),
+                                 model="openai/gpt-oss-120b", extraction_model="openai/gpt-oss-120b"), repo)
+    assert isinstance(agent.extraction_llm, GroqLLM) and isinstance(agent.responder, LLMResponder)

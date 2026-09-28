@@ -1,3 +1,4 @@
+import os
 from datetime import date
 from pathlib import Path
 
@@ -5,6 +6,7 @@ import pytest
 
 from claims_agent.domain.repository import FixtureRepository
 
+os.environ["CLAIMS_AGENT_SKIP_DOTENV"] = "1"  # tests never read the developer's real .env
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 TODAY = date(2026, 9, 28)
 

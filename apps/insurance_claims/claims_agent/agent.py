@@ -1,4 +1,5 @@
 """Turn pipeline: extract -> remember -> control -> tools -> context -> respond -> validate."""
+import os
 from datetime import date
 
 from claims_agent.audit import AuditEvent
@@ -132,7 +133,7 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
         extraction_llm: LLMClient = FakeLLM(script)
     elif mode == "live":
         env = Settings.from_env()
-        settings = Settings(agent_mode="llm", api_key=env.api_key, model=env.model,
+        settings = Settings(agent_mode="llm", provider=env.provider, api_key=env.api_key, model=env.model,
                             extraction_model=env.extraction_model, app_today=today, consent_scenario=consent_scenario)
         extraction_llm, live_responder = llm_clients(settings)
         responder = LLMResponder(live_responder)
@@ -156,11 +157,20 @@ def llm_clients(settings: Settings):
     """(extraction_llm, responder_llm). Rules mode has no model at all."""
     if settings.agent_mode == "rules":
         return NullLLM(), None
+    if settings.provider == "groq":
+        import groq
+
+        from claims_agent.llm.groq_client import GroqLLM
+
+        retries = int(os.environ.get("LLM_MAX_RETRIES", "3"))
+        client = groq.Groq(api_key=settings.api_key.get_secret_value(), timeout=60.0, max_retries=retries)
+        return GroqLLM(client, settings.extraction_model), GroqLLM(client, settings.model)
     import anthropic
 
     from claims_agent.llm.client import AnthropicLLM
 
-    client = anthropic.Anthropic(api_key=settings.api_key.get_secret_value(), timeout=20.0, max_retries=1)
+    retries = int(os.environ.get("LLM_MAX_RETRIES", "1"))
+    client = anthropic.Anthropic(api_key=settings.api_key.get_secret_value(), timeout=20.0, max_retries=retries)
     return AnthropicLLM(client, settings.extraction_model), AnthropicLLM(client, settings.model)
 
 

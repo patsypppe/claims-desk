@@ -71,7 +71,19 @@ def compute_metrics(results: list[ScenarioResult]) -> dict:
         "redundant_question_rate": _ratio(sum(redundant), len(redundant)),
         "recovery_success_rate": _scenario_ratio(results, lambda r: r.passed, lambda r: "recovery" in r.scenario.tags),
         "avg_turns_to_resolution": _avg_turns(completed),
+        "llm_degraded_turns": _ratio(sum(1 for t in turns if _kinds(t) & {"llm_degraded"}), len(turns)),
+        "validator_rejections": _count(turns, "validator_reject"),
+        "template_fallbacks": _count(turns, "fallback_used"),
     }
+
+
+def _kinds(turn) -> set[str]:
+    return {e["kind"] for e in turn.events}
+
+
+def _count(turns, kind: str) -> dict:
+    n = sum(1 for t in turns for e in t.events if e["kind"] == kind)
+    return {"numerator": n, "denominator": None, "value": n}
 
 
 def _avg_turns(completed: list[ScenarioResult]) -> dict:

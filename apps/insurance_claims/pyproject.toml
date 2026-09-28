@@ -5,6 +5,7 @@ description = "SOP-controlled conversational insurance claims support agent"
 requires-python = ">=3.12"
 dependencies = [
   "anthropic>=1.0",
+  "groq>=0.30",
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "pydantic>=2.8",

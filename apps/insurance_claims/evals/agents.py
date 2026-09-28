@@ -1,21 +1,25 @@
 """Agent factories for the eval CLI. Each scenario gets a fresh agent configured from the scenario."""
-import os
 from datetime import date
 
 from evals.scenario import Scenario
 
 
-def baseline_factory(repo):
-    import anthropic
+def live_llm():
+    """The configured provider's response-model client (same model the final agent phrases with)."""
+    from claims_agent.agent import llm_clients
+    from claims_agent.config import Settings
 
+    settings = Settings.from_env()
+    if settings.agent_mode != "llm":
+        raise SystemExit("Live evaluation needs AGENT_MODE=llm and a provider API key in .env.")
+    return llm_clients(settings)[1]
+
+
+def baseline_factory(repo):
     from evals.baseline_agent import BaselineAgent
 
-    key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("AI_API_KEY")
-    if not key:
-        raise SystemExit("The baseline agent needs ANTHROPIC_API_KEY (or AI_API_KEY).")
-    client = anthropic.Anthropic(api_key=key)
-    model = os.environ.get("AI_MODEL") or "claude-opus-5"
-    return lambda scenario: BaselineAgent(repo, client=client, model=model)
+    llm = live_llm()
+    return lambda scenario: BaselineAgent(repo, llm=llm)
 
 
 def final_factory(repo, mode: str, flags: dict):

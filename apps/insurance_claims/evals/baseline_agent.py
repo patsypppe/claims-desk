@@ -52,10 +52,10 @@ def _fixture_dump(repo: FixtureRepository) -> str:
 
 @dataclass
 class BaselineAgent:
+    """Any LLMClient (Anthropic, Groq, fake) — the same provider the final agent is evaluated with."""
     repo: FixtureRepository
-    client: object
-    model: str
-    histories: dict[str, list[dict]] = field(default_factory=dict)
+    llm: object
+    histories: dict[str, list[str]] = field(default_factory=dict)
 
     def new_session(self) -> str:
         sid = uuid.uuid4().hex
@@ -63,16 +63,13 @@ class BaselineAgent:
         return sid
 
     def handle(self, session_id: str, text: str) -> BaselineResult:
-        history = self.histories[session_id] + [{"role": "user", "content": text}]
-        response = self.client.messages.parse(
-            model=self.model, max_tokens=2048,
-            system=f"{SOP_TEXT}\n\nDATA:\n{_fixture_dump(self.repo)}",
-            messages=history, output_format=BaselineTurn,
-        )
-        parsed = response.parsed_output if response.stop_reason != "refusal" else None
+        history = self.histories[session_id] + [f"CALLER: {text}"]
+        parsed = self.llm.parse(system=f"{SOP_TEXT}\n\nDATA:\n{_fixture_dump(self.repo)}",
+                                user="Conversation so far:\n" + "\n".join(history) + "\n\nWrite the agent's next turn.",
+                                schema=BaselineTurn, effort="low", max_tokens=2048)
         if parsed is None:
             parsed = BaselineTurn(reply="Sorry, I can't help with that.", phase="VERIFY_ID", verified=False)
-        self.histories[session_id] = history + [{"role": "assistant", "content": parsed.reply}]
+        self.histories[session_id] = history + [f"AGENT: {parsed.reply}"]
         snapshot = parsed.model_dump(exclude={"reply", "tool_calls"})
         events = tuple({"kind": "tool_called", "detail": {"tool": t, "phase": parsed.phase, "consent": parsed.consent}}
                        for t in parsed.tool_calls)

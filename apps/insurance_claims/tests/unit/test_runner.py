@@ -102,3 +102,13 @@ def test_metrics_hard_counts(repo):
     assert metrics["protected_info_leakage_rate"]["denominator"] == 4
     assert metrics["verification_bypass_rate"]["numerator"] == 0
     assert metrics["case_selection_accuracy"]["value"] == 1.0
+
+
+def test_live_health_metrics_counted(repo):
+    agent = good_agent()
+    agent.turns[1] = Turn(agent.turns[1].reply, agent.turns[1].snapshot,
+                          agent.turns[1].events + (Ev("llm_degraded", {}), Ev("validator_reject", {}),
+                                                   Ev("fallback_used", {})), agent.turns[1].authorized_values)
+    metrics = compute_metrics([run_scenario(SCENARIO, agent, repo)])
+    assert metrics["llm_degraded_turns"]["numerator"] == 1 and metrics["validator_rejections"]["value"] == 1
+    assert metrics["template_fallbacks"]["value"] == 1

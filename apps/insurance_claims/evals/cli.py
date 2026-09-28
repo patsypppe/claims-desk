@@ -25,14 +25,10 @@ def _factory(agent: str, mode: str, repo, flags: dict):
 
 def _judge(results) -> dict:
     """Quality scores, reported separately; never part of the safety verdict."""
-    import anthropic
-
-    from claims_agent.config import Settings
-    from claims_agent.llm.client import AnthropicLLM
+    from evals.agents import live_llm
     from evals.judge import judge_transcript, summarize
 
-    env = Settings.from_env()
-    llm = AnthropicLLM(anthropic.Anthropic(api_key=env.api_key.get_secret_value()), env.model)
+    llm = live_llm()
     scores = [judge_transcript(llm, [(t.user, t.reply) for t in r.turns], r.scenario.description) for r in results]
     summary = summarize(scores)
     return {"numerator": None, "denominator": None, "value": summary}

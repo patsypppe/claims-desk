@@ -10,11 +10,32 @@ from pydantic import SecretStr
 from claims_agent.clock import Clock, FixedClock, SystemClock
 
 DEFAULT_FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
+REPO_ROOT = Path(__file__).resolve().parents[3]
 AgentMode = Literal["llm", "rules"]
+Provider = Literal["anthropic", "groq"]
+PROVIDERS: dict[str, dict[str, object]] = {
+    "anthropic": {"keys": ("ANTHROPIC_API_KEY", "AI_API_KEY"), "model": "claude-opus-5"},
+    "groq": {"keys": ("GROQ_API_KEY", "AI_API_KEY"), "model": "openai/gpt-oss-120b"},
+}
 
 
 class ConfigError(RuntimeError):
     """Raised when required configuration is missing or invalid."""
+
+
+def load_dotenv(path: Path) -> None:
+    """Minimal .env loader: KEY=VALUE lines, comments ignored, never overrides real environment variables."""
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        os.environ.setdefault(key.strip(), value)
 
 
 def _int_env(name: str, default: int) -> int:
@@ -50,6 +71,7 @@ def _date_env(name: str) -> date | None:
 @dataclass(frozen=True)
 class Settings:
     agent_mode: AgentMode = "rules"
+    provider: Provider = "anthropic"
     api_key: SecretStr | None = field(default=None, repr=False)
     model: str = "claude-opus-5"
     extraction_model: str = "claude-opus-5"
@@ -69,19 +91,26 @@ class Settings:
         return FixedClock(self.app_today) if self.app_today else SystemClock()
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls, dotenv: Path | None = None) -> "Settings":
+        if os.environ.get("CLAIMS_AGENT_SKIP_DOTENV") != "1":
+            load_dotenv(dotenv or REPO_ROOT / ".env")
         mode = os.environ.get("AGENT_MODE", "llm").strip().lower()
         if mode not in ("llm", "rules"):
             raise ConfigError(f"AGENT_MODE must be 'llm' or 'rules', got {mode!r}")
-        raw_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("AI_API_KEY")
+        provider = (os.environ.get("AI_PROVIDER") or "anthropic").strip().lower()
+        if provider not in PROVIDERS:
+            raise ConfigError(f"AI_PROVIDER must be one of {sorted(PROVIDERS)}, got {provider!r}")
+        key_names = PROVIDERS[provider]["keys"]
+        raw_key = next((os.environ[k] for k in key_names if os.environ.get(k)), None)
         if mode == "llm" and not raw_key:
             raise ConfigError(
-                "AGENT_MODE=llm requires ANTHROPIC_API_KEY (or AI_API_KEY). "
+                f"AGENT_MODE=llm with AI_PROVIDER={provider} requires {key_names[0]} (or AI_API_KEY). "
                 "Set it in .env, or run with AGENT_MODE=rules for the deterministic no-LLM mode."
             )
-        model = os.environ.get("AI_MODEL") or "claude-opus-5"
+        model = os.environ.get("AI_MODEL") or str(PROVIDERS[provider]["model"])
         return cls(
             agent_mode=mode,  # type: ignore[arg-type]
+            provider=provider,  # type: ignore[arg-type]
             api_key=SecretStr(raw_key) if raw_key else None,
             model=model,
             extraction_model=os.environ.get("AI_EXTRACTION_MODEL") or model,
