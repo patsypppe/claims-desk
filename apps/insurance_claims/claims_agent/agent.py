@@ -121,7 +121,8 @@ def assemble(*, repo, settings, clock, extraction_llm, responder, registry, vali
 
 def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, consent_scenario: str = "default",
                          email_fails: bool = False, scripted_analyses: list | None = None,
-                         no_validator: bool = False, no_guard: bool = False, responder_llm=None) -> Agent:
+                         no_validator: bool = False, no_guard: bool = False, responder_llm=None,
+                         leaky_responder: bool = False) -> Agent:
     settings = Settings(agent_mode="rules" if mode == "rules" else "llm", app_today=today,
                         consent_scenario=consent_scenario)
     clock = FixedClock(today)
@@ -137,6 +138,10 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
         responder = LLMResponder(live_responder)
     else:
         extraction_llm = NullLLM()
+    if leaky_responder:
+        from evals.adversaries import AlwaysLeakyLLM
+
+        responder_llm = AlwaysLeakyLLM()
     if responder_llm is not None:
         responder = LLMResponder(responder_llm)
     registry = _registry(repo, clock, settings, email_fails, consent_scenario, no_guard)

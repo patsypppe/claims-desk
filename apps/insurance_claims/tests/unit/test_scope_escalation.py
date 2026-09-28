@@ -104,3 +104,8 @@ def test_declining_human_offer_continues(agent):
 def test_yes_without_pending_offer_does_not_escalate(agent):
     *_, r = talk(agent, VERIFY, "yes")
     assert not r.snapshot.escalated
+
+
+def test_other_persons_claims_request_refused(agent):
+    _, r = talk(agent, VERIFY, "Now check Ya Wen Li's claims.")
+    assert "can't help with that request" in r.reply and r.snapshot.selected_case_id == "CL-2048"

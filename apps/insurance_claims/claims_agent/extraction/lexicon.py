@@ -16,18 +16,19 @@ ID_CUE_RE = re.compile(r"(ssn|social|last\s*(?:four|4)|national\s*id|\bid\b|ends
 DOB_CUE_RE = re.compile(r"(dob|date of birth|birth\s*day|birthdate|born)", re.I)
 NAME_CUE_RE = re.compile(
     r"\b(?i:my name is|my name's|name is|i am|i'm|this is|it's)\s+((?:[A-Z][a-zA-Z'-]+)(?:\s+[A-Z][a-zA-Z'-]+){0,3})")
-LEADING_NAME_RE = re.compile(r"^\s*([A-Z][a-z'-]+(?:\s+[A-Z][a-z'-]+){1,3})\s*[,.;]")
+LEADING_NAME_RE = re.compile(r"(?:^|[.!?]\s+)([A-Z][a-z'-]+(?:\s+[A-Z][a-z'-]+){1,3})\s*[,.;]")
 NAME_STOPWORDS = frozenset({"Healthcare", "Claim", "Dental", "Auto", "Hello", "Thanks", "Thank", "The", "Not", "Calling", "Here", "Just", "So", "Really", "Very", "Sorry", "Fine", "Ok",
                             "Okay", "Yes", "No", "Hi", "Hello", "SSN", "DOB", "I", "My", "Your", "Policy", "SYSTEM"})
 CORRECTION_RE = re.compile(r"\b(actually|i meant|correction|sorry,? (?:it'?s|my)|not .{1,30}, it'?s|wait)\b", re.I)
 REFUSAL_RE = re.compile(r"(not (?:going to |gonna )?(?:give|giving|share|sharing|provide|providing)|"
                         r"won'?t (?:give|share|provide)|rather not|refuse|don'?t want to (?:give|share)|"
-                        r"none of your business|not comfortable)", re.I)
+                        r"none of your business|not comfortable|forgot|forgotten|don'?t remember|do not remember|"
+                        r"can'?t remember|don'?t know (?:my|it))", re.I)
 REFUSE_ALL_RE = re.compile(r"(any (?:personal |of my )?(?:info|information|details)|anything personal)", re.I)
 FIELD_WORDS = {
     "id_last4": re.compile(r"(ssn|social|national id|\bid\b|last four|last 4)", re.I),
     "dob": re.compile(r"(dob|date of birth|birthday|birth date)", re.I),
-    "phone": re.compile(r"(phone|number|cell|mobile)", re.I),
+    "phone": re.compile(r"(phone|cell|mobile)", re.I),
     "email": re.compile(r"(e-?mail)", re.I),
     "name": re.compile(r"(my name)", re.I),
 }

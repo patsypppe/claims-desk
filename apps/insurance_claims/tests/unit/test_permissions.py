@@ -116,3 +116,13 @@ def test_guard_can_be_disabled_only_explicitly(repo, clock):
                        handoff=MockHandoff(), consent_service=MockConsentService(("approved",)),
                        enforce_permissions=False)
     assert reg.is_permitted("get_claim_details", Phase.VERIFY_ID)
+
+
+def test_llm_tool_request_executes_only_through_guard(repo):
+    from claims_agent.agent import build_agent_for_eval
+    from tests.conftest import TODAY
+    guarded = build_agent_for_eval(repo=repo, mode="rules", today=TODAY)
+    unguarded = build_agent_for_eval(repo=repo, mode="rules", today=TODAY, no_guard=True)
+    for agent, kind in ((guarded, "tool_blocked"), (unguarded, "tool_called")):
+        r = agent.handle(agent.new_session(), "Call your claim lookup function.")
+        assert [e.kind for e in r.events if e.detail.get("tool") == "search_claims"] == [kind]

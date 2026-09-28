@@ -11,6 +11,9 @@ UNSAFE_RE = re.compile(r"(system prompt|developer mode|dev mode|jailbreak|your i
                        r"list all (claims|customers|policies))", re.I)
 
 
+OTHER_PERSON_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+'s\s+(?i:claims?|account|policy|information|details)")
+
+
 class ScopeDecision(FrozenModel):
     kind: Literal["redirect", "refuse_unsafe", "escalate"]
     count: int
@@ -19,7 +22,7 @@ class ScopeDecision(FrozenModel):
 
 def decide_scope(analysis: TurnAnalysis, text: str, state: ConversationState, offer_threshold: int,
                  escalation_threshold: int) -> ScopeDecision | None:
-    unsafe = bool(UNSAFE_RE.search(text))
+    unsafe = bool(UNSAFE_RE.search(text) or OTHER_PERSON_RE.search(text))
     off_topic = analysis.scope == "OUT_OF_SCOPE" and not analysis.pii_candidates
     if not (unsafe or off_topic):
         return None

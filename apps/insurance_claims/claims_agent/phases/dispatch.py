@@ -19,10 +19,14 @@ HANDLERS = {
 
 
 def _guard_tool_requests(ctx: StepContext, state: ConversationState) -> None:
-    """LLM/caller tool requests never execute directly; forbidden ones are recorded as blocked attempts."""
+    """LLM/caller tool requests go through the permission guard like any other call.
+
+    Permitted requests run (identity scope still comes from state; results are not disclosed unless the
+    controller's own flow uses them); forbidden ones are blocked and audited.
+    """
     for request in ctx.analysis.tool_requests:
-        if not ctx.ctl.registry.is_permitted(request.name, state.phase):
-            ctx.call(request.name, state)
+        args = {k: v for k, v in (("case_id", request.case_id), ("document", request.document)) if v}
+        ctx.call(request.name, state, **args)
 
 
 def run(ctx: StepContext, state: ConversationState) -> Decision:

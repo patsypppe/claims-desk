@@ -77,9 +77,11 @@ class RuleExtractor:
             words = [w for w in m.group(1).split() if w not in lx.NAME_STOPWORDS]
             if len(words) >= 2 and all(w[0].isupper() for w in words):
                 names.append(" ".join(words))
-        lead = lx.LEADING_NAME_RE.match(text)
-        if not names and lead and not any(w in lx.NAME_STOPWORDS for w in lead.group(1).split()):
-            names.append(lead.group(1))
+        if not names:
+            for lead in lx.LEADING_NAME_RE.finditer(text):
+                if not any(w in lx.NAME_STOPWORDS for w in lead.group(1).split()):
+                    names.append(lead.group(1))
+                    break
         bare = text.strip().strip(".!")
         if not names and expected == "name" and re.fullmatch(r"[A-Za-z'-]+(?:\s+[A-Za-z'-]+){1,3}", bare):
             names.append(bare)

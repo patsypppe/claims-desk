@@ -167,3 +167,14 @@ def test_document_unavailable_variants(rx, text):
 def test_third_party_speaker_name_not_a_pii_factor(rx):
     a = rx.analyze("I'm David Chen, calling for my mother Margaret Chen, I'm her son.", None)
     assert a.speaker_name == "David Chen" and fields(a) == {"name": "Margaret Chen"}
+
+
+@pytest.mark.parametrize("text,field", [("I forgot my DOB but here's my policy number POL-9921", "dob"),
+                                        ("I don't remember my email", "email")])
+def test_forgotten_field_treated_as_unavailable(rx, text, field):
+    assert (field, True) in [(c.field, c.caller_refused) for c in rx.analyze(text, None).pii_candidates]
+
+
+def test_name_at_sentence_start_after_other_content(rx):
+    a = rx.analyze("Policy POL-1044. Margaret Chen, DOB 1985-03-15, SSN last four 4472.", None)
+    assert fields(a)["name"] == "Margaret Chen"
