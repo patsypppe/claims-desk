@@ -81,6 +81,10 @@ THIRD_PARTY_RE = re.compile(r"(\bi'?m\s+(?:\w+\s+){1,3}?\w+'s\s+(?:husband|wife|
                             r"son|daughter|parent|spouse)|i'?m (?:her|his) (\w+))", re.I)
 RELATIONSHIP_RE = re.compile(r"\b(son|daughter|husband|wife|mother|father|mom|dad|brother|sister|spouse|partner|"
                              r"friend|caregiver)\b", re.I)
+# corroboration an LLM "third_party" label needs: some relation/behalf wording actually in the caller's text
+THIRD_PARTY_CUE_RE = re.compile(r"\b(son|daughter|husband|wife|mother|father|mom|mum|dad|brother|sister|spouse|partner|"
+                                r"friend|caregiver|guardian|client|attorney|lawyer|parent|behalf|someone else|"
+                                r"(?:her|his|their) (?:claim|policy|account|name|behalf))\b", re.I)
 TOPIC_RULES = (
     ("appeal_question", r"appeal"),
     ("denial_question", r"why .*(denied|denial|rejected)|reason .*(denied|denial)"),

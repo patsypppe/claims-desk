@@ -7,6 +7,7 @@ import re
 from datetime import date
 
 from claims_agent.audit import AuditEvent, mask
+from claims_agent.extraction import lexicon as lx
 from claims_agent.extraction.schema import IntentHintsIn, PiiCandidate, TurnAnalysis
 from claims_agent.normalize import (
     MONTH_ALT,
@@ -137,7 +138,10 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
     relationship = rules.stated_relationship or (
         llm.stated_relationship if _in_text(llm.stated_relationship, text) else None)
     speaker = rules.speaker_name or (llm.speaker_name if _in_text(llm.speaker_name, text) else None)
-    third_party = "third_party" in (rules.speaker_role, llm.speaker_role)
+    llm_role = llm.speaker_role
+    if llm_role == "third_party" and rules.speaker_role != "third_party" and not lx.THIRD_PARTY_CUE_RE.search(text):
+        llm_role = "unknown"  # sticky and locks the caller out: needs relation/behalf wording in the text
+    third_party = "third_party" in (rules.speaker_role, llm_role)
     if speaker and third_party:  # a third-party caller's own name is never the policyholder's name factor
         from claims_agent.normalize import name_tokens
         pii = [c for c in pii if c.field != "name" or c.caller_refused or name_tokens(c.raw_value) != name_tokens(speaker)]
@@ -145,8 +149,8 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
             pii.append(PiiCandidate(field="name", raw_value=rules.stated_subject_name))
     merged = TurnAnalysis(
         pii_candidates=pii, policy_number=policy, intent=intent,
-        speaker_role="third_party" if "third_party" in (rules.speaker_role, llm.speaker_role)
-        else (llm.speaker_role if llm.speaker_role != "unknown" else rules.speaker_role),
+        speaker_role="third_party" if third_party
+        else (llm_role if llm_role != "unknown" else rules.speaker_role),
         stated_relationship=relationship,
         stated_subject_relation=rules.stated_subject_relation or (
             llm.stated_subject_relation if _in_text(llm.stated_subject_relation, text) else None),

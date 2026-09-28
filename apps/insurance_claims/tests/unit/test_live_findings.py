@@ -76,3 +76,15 @@ def test_llm_claim_id_that_is_not_a_claim_id_is_rejected():
     from claims_agent.extraction.schema import IntentHintsIn
     merged = M(text, TurnAnalysis(intent=IntentHintsIn(claim_id="POL-9921")))
     assert merged.intent.claim_id is None
+
+
+def test_llm_only_third_party_label_on_a_name_correction_is_not_trusted():
+    # live qwen probe: "that's Margaret" read as a different person -> policyholder locked out as a third party
+    text = "sorry thats Margaret, M-A-R-G-A-R-E-T"
+    assert M(text, TurnAnalysis(speaker_role="third_party")).speaker_role != "third_party"
+
+
+@pytest.mark.parametrize("text", ["My wife asked me to call about her claim.",
+                                  "I'm calling for my client, the policy is in her name."])
+def test_llm_third_party_label_with_a_relation_cue_in_text_is_kept(text):
+    assert M(text, TurnAnalysis(speaker_role="third_party")).speaker_role == "third_party"
