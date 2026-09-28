@@ -198,8 +198,8 @@ RENDERERS = {
     A.CRISIS_SUPPORT: lambda ctx: ("I'm really sorry you're going through this. Please reach out now: in the U.S. "
                                    "call or text 988 (Suicide & Crisis Lifeline), or call 911 if you're in immediate "
                                    "danger. A member of our team will be with you shortly."),
-    A.REFUSE_READBACK: lambda ctx: ("For your security, I never read back identifiers like your SSN, date of birth or "
-                                    "full phone number." + _resume(ctx)),
+    A.REFUSE_READBACK: lambda ctx: ("For your security, I never read back personal identifiers such as your SSN, date "
+                                    "of birth, phone number or email address." + _resume(ctx)),
     A.OTP_SENT: lambda ctx: (("I've sent a new code. " if ctx.details.get("resent") else
                               "That's okay, we can confirm it's you another way. ")
                              + "If the details you've shared match our records, a 6-digit code is on its way to the "

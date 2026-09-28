@@ -125,3 +125,26 @@ def test_positive_reply_to_single_option_menu_selects():
     opt = CaseOption(case_id="CL-3001", case_type="healthcare", status="denied", month=3, year=2026,
                      display="the healthcare claim from March 2026")
     assert pick_option((opt,), IntentHints(), "yes please") == "CL-3001"
+
+
+# Minor (helpfulness): providers and insurers are not "another person"
+@pytest.mark.parametrize("text", ["What's Mercy Hospital's address?", "What is Dr Patel's phone number?",
+                                  "Is Blue Cross's number the same?"])
+def test_provider_questions_are_not_other_person_pii(text):
+    from claims_agent.policy.scope import OTHER_PERSON_RE, is_other_person_request
+    assert OTHER_PERSON_RE.search(text) and not is_other_person_request(text)
+
+
+def test_other_person_pii_request_still_blocked():
+    from claims_agent.policy.scope import is_other_person_request
+    assert is_other_person_request("What's Margaret Chen's email address?")
+
+
+# Minor (quality): only the parts actually asked about are answered
+def test_statement_after_a_question_does_not_add_asked_attributes():
+    assert rx.analyze("Why was it denied? I can't pay this bill.", None).intent.asked_attributes == ["denial_reason"]
+
+
+def test_readback_refusal_names_identifiers_generically(agent):
+    [r] = talk(agent, "What is my email on file?")
+    assert "email" in r.reply.lower()

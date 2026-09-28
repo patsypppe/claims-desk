@@ -14,6 +14,15 @@ UNSAFE_RE = re.compile(r"(system prompt|developer mode|dev mode|jailbreak|your i
 OTHER_PERSON_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+'s\s+(?i:claims?|account|policy|information|details|"
                              r"email(?: address)?|phone(?: number)?|address|date of birth|dob|ssn|social|number|info|"
                              r"data|birthday)")
+ORG_WORDS = frozenset({"dr", "doctor", "hospital", "clinic", "center", "centre", "medical", "health", "healthcare",
+                       "insurance", "cross", "shield", "pharmacy", "lab", "labs", "care", "urgent", "garage", "auto",
+                       "body", "shop", "dental", "imaging", "radiology", "group", "associates", "inc", "llc"})
+
+
+def is_other_person_request(text: str) -> bool:
+    """Someone else's personal data ("Margaret Chen's email"); providers and insurers are not people."""
+    return any(not ORG_WORDS & {w.lower().rstrip(".") for w in m.group(0).split("'")[0].split()}
+               for m in OTHER_PERSON_RE.finditer(text))
 
 
 class ScopeDecision(FrozenModel):
@@ -24,7 +33,7 @@ class ScopeDecision(FrozenModel):
 
 def decide_scope(analysis: TurnAnalysis, text: str, state: ConversationState, offer_threshold: int,
                  escalation_threshold: int) -> ScopeDecision | None:
-    unsafe = bool(UNSAFE_RE.search(text) or OTHER_PERSON_RE.search(text))
+    unsafe = bool(UNSAFE_RE.search(text) or is_other_person_request(text))
     off_topic = analysis.scope == "OUT_OF_SCOPE" and not analysis.pii_candidates
     if not (unsafe or off_topic):
         return None

@@ -14,6 +14,13 @@ def _first(rules, text: str, default: str) -> str:
     return next((label for label, pattern in rules if re.search(pattern, text, re.I)), default)
 
 
+
+def _questions(low: str) -> str:
+    """Only the sentences that ask something: "Why was it denied? I can't pay this bill." asks one thing."""
+    parts = re.split(r"(?<=[?.!])\s+", low)
+    return " ".join(p for p in parts if p.rstrip().endswith("?")
+                    or p.startswith(("what", "why", "when", "which", "how", "who", "where", "can", "could", "do", "is")))
+
 class RuleExtractor:
     def __init__(self, today: date) -> None:
         self._today = today
@@ -154,7 +161,7 @@ class RuleExtractor:
             topic=_first(lx.TOPIC_RULES, low, "none"),
             asked_attribute=_first(lx.ATTRIBUTE_RULES, low, "none") if "?" in text or low.startswith(
                 ("what", "why", "when", "which", "how", "who")) else "none",
-            asked_attributes=[a for a, pat in lx.ATTRIBUTE_RULES if re.search(pat, low)]
+            asked_attributes=[a for a, pat in lx.ATTRIBUTE_RULES if re.search(pat, _questions(low))]
             if "?" in text else [],
             documents_mentioned=docs, document_unavailable=unavailable,
         )
