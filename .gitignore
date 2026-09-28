@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+apps/insurance_claims/evals/reports/
+.superpowers/
+.DS_Store
+*.egg-info/
