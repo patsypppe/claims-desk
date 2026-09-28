@@ -98,11 +98,49 @@ def build_agent_for_eval(*, repo: FixtureRepository, mode: str, today: date, con
     settings = Settings(agent_mode="rules" if mode == "rules" else "llm", app_today=today,
                         consent_scenario=consent_scenario)
     clock = FixedClock(today)
+    responder: Responder = TemplateResponder()
     if mode == "fake":
         script = [TurnAnalysis.model_validate(a) if a else None for a in (scripted_analyses or [])]
         extraction_llm: LLMClient = FakeLLM(script)
+    elif mode == "live":
+        from claims_agent.response.llm_responder import LLMResponder
+
+        env = Settings.from_env()
+        settings = Settings(agent_mode="llm", api_key=env.api_key, model=env.model,
+                            extraction_model=env.extraction_model, app_today=today, consent_scenario=consent_scenario)
+        extraction_llm, live_responder = llm_clients(settings)
+        responder = LLMResponder(live_responder)
     else:
         extraction_llm = NullLLM()
+    if responder_llm is not None:
+        from claims_agent.response.llm_responder import LLMResponder
+
+        responder = LLMResponder(responder_llm)
     registry = _registry(repo, clock, settings, email_fails, consent_scenario, no_guard)
     return assemble(repo=repo, settings=settings, clock=clock, extraction_llm=extraction_llm,
-                    responder=TemplateResponder(), registry=registry)
+                    responder=responder, registry=registry)
+
+
+def llm_clients(settings: Settings):
+    """(extraction_llm, responder_llm). Rules mode has no model at all."""
+    if settings.agent_mode == "rules":
+        return NullLLM(), None
+    import anthropic
+
+    from claims_agent.llm.client import AnthropicLLM
+
+    client = anthropic.Anthropic(api_key=settings.api_key.get_secret_value(), timeout=20.0, max_retries=1)
+    return AnthropicLLM(client, settings.extraction_model), AnthropicLLM(client, settings.model)
+
+
+def build_agent(settings: Settings, repo: FixtureRepository | None = None,
+                lockouts: LockoutRegistry | None = None) -> Agent:
+    from claims_agent.response.llm_responder import LLMResponder
+
+    repo = repo or FixtureRepository.load(settings.fixtures_dir)
+    clock = settings.clock()
+    extraction_llm, responder_llm = llm_clients(settings)
+    responder = LLMResponder(responder_llm) if responder_llm else TemplateResponder()
+    registry = _registry(repo, clock, settings, consent_scenario=settings.consent_scenario)
+    return assemble(repo=repo, settings=settings, clock=clock, extraction_llm=extraction_llm, responder=responder,
+                    registry=registry, lockouts=lockouts)
