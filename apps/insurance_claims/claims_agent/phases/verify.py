@@ -60,16 +60,39 @@ def failed(ctx: StepContext, state: ConversationState, candidate: str | None) ->
     return ctx.decide(state, A.VERIFY_FAILED, alternatives=alternatives, details={"attempts_left": remaining})
 
 
+MAX_OTP_SENDS = 2
+MAX_OTP_REMINDERS = 2
+RESEND_RE = re.compile(r"(resend|send (?:it|the code|another)|new code|didn'?t (?:get|receive)|never (?:got|came))", re.I)
+NO_ACCESS_RE = re.compile(r"(no (?:longer )?(?:have )?access|(?:don'?t|do not|no longer) have access|can'?t (?:access|get into|open)|don'?t (?:have|know) "
+                          r"(?:the|that|my)? ?(?:code|email|phone)|old (?:email|number)|lost my phone)", re.I)
+
+
 def _send_otp(ctx: StepContext, state: ConversationState) -> Decision:
-    ctx.call("send_otp", state)
-    state = state.model_copy(update={"otp_pending": True, "expected_field": "otp"})
-    return ctx.decide(state, A.OTP_SENT)
+    if state.otp_sends >= MAX_OTP_SENDS:
+        return ctx.escalate(state.model_copy(update={"otp_pending": False}), "otp_unavailable")
+    candidate = ctx.ctl.registry.verifier.partial_match(state)
+    ctx.call("send_otp", state, suppress_delivery=ctx.ctl.is_locked_out(candidate))  # same reply either way
+    state = state.model_copy(update={"otp_pending": True, "expected_field": "otp", "otp_sends": state.otp_sends + 1,
+                                     "otp_reminders": 0})
+    return ctx.decide(state, A.OTP_SENT, details={"resent": state.otp_sends > 1})
+
+
+def _otp_no_code(ctx: StepContext, state: ConversationState) -> Decision:
+    if NO_ACCESS_RE.search(ctx.text):
+        return ctx.escalate(state.model_copy(update={"otp_pending": False}), "otp_unavailable")
+    if RESEND_RE.search(ctx.text):
+        return _send_otp(ctx, state)
+    reminders = state.otp_reminders + 1
+    state = state.model_copy(update={"otp_reminders": reminders})
+    if reminders > MAX_OTP_REMINDERS:
+        return ctx.escalate(state.model_copy(update={"otp_pending": False}), "otp_unavailable")
+    return ctx.decide(state, A.OTP_REMIND)
 
 
 def _otp_turn(ctx: StepContext, state: ConversationState) -> Decision:
     match = OTP_CODE_RE.search(ctx.text)
     if not match:
-        return ctx.decide(state, A.OTP_REMIND)
+        return _otp_no_code(ctx, state)
     started = time.monotonic()
     result = ctx.call("verify_otp", state, code=match.group(1))
     ctx.ctl.pad_verification(started)
@@ -79,7 +102,7 @@ def _otp_turn(ctx: StepContext, state: ConversationState) -> Decision:
     if status == "wrong":
         return ctx.decide(state, A.OTP_WRONG)
     state = state.model_copy(update={"otp_pending": False})
-    return failed(ctx, state, None)
+    return failed(ctx, state, result.data.get("candidate"))  # exhausted/expired codes count toward the lockout
 
 
 def _otp_policy_applies(ctx: StepContext, state: ConversationState, refused_now: list[str]) -> bool:

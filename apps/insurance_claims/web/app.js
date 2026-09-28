@@ -82,6 +82,7 @@ function describe(event) {
     case "escalated": return [`⇪ escalated: ${d.reason}`, "warn"];
     case "consent": return [`✎ email consent: ${d.outcome}`, "transition"];
     case "llm_degraded": return ["! LLM unavailable — rules fallback", "warn"];
+    case "guard_scored": return d.flagged ? ["⚑ classifier flagged manipulation attempt", "blocked"] : [null, ""];
     default: return [null, ""];
   }
 }

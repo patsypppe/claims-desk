@@ -98,6 +98,8 @@ class ConversationState(FrozenModel):
     escalation: Escalation = Escalation()
     expected_field: PiiField | Literal["otp"] | None = None
     otp_pending: bool = False
+    otp_sends: int = 0
+    otp_reminders: int = 0
     last_reply: str | None = None
     last_authorized_values: tuple[str, ...] = ()
     last_emotion: str = "neutral"

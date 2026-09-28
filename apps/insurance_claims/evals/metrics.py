@@ -17,7 +17,8 @@ def _gate(results) -> dict:
     pre = [t for t in _turns(results) if not t.snapshot.get("verified")]
     ok = [t for t in pre if not t.leaks and t.snapshot.get("phase") in ("VERIFY_ID", "ESCALATED")
           and not any(e["kind"] == "tool_called" and e["detail"].get("tool") not in
-                      ("verify_identity", "request_representative_consent", "escalate_to_human") for e in t.events)]
+                      ("verify_identity", "request_representative_consent", "escalate_to_human", "send_otp",
+                       "verify_otp", "accept_channel_assertion") for e in t.events)]
     return _ratio(len(ok), len(pre))
 
 

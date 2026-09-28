@@ -11,7 +11,6 @@ from claims_agent.audit import AuditEvent
 from claims_agent.domain.models import FrozenModel
 from claims_agent.extraction import lexicon as lx
 from claims_agent.extraction.schema import TurnAnalysis
-from claims_agent.normalize import normalize_dob
 
 PLACEHOLDER_RE = re.compile(r"⟦[A-Z0-9]+_\d+⟧")
 
@@ -21,14 +20,22 @@ class Redaction(FrozenModel):
     mapping: dict[str, str]
 
 
+SSN_RE = re.compile(r"(?<!\d)\d{3}[- ]\d{2}[- ]\d{4}(?!\d)")
+SPELLED_DATE_RE = re.compile(r"\b(?:the\s+)?[a-z]+(?:st|nd|rd|th)?\s+(?:day\s+)?of\s+" + lx.MONTH_ALT
+                             + r",?\s+\d{4}", re.I)
+
+
 def _spans(text: str, today: date) -> list[tuple[int, int, str]]:
     spans = [(m.start(), m.end(), "EMAIL") for m in lx.EMAIL_RE.finditer(text)]
+    spans += [(m.start(), m.end(), "SSN") for m in SSN_RE.finditer(text)]
     spans += [(m.start(), m.end(), "PHONE") for m in lx.PHONE_RE.finditer(text)]
-    for pattern in lx.DATE_RES:
-        spans += [(m.start(), m.end(), "DOB") for m in pattern.finditer(text) if normalize_dob(m.group(0), today)]
+    for pattern in (*lx.DATE_RES, SPELLED_DATE_RE):  # any date-like span, valid or not (fail-safe)
+        spans += [(m.start(), m.end(), "DOB") for m in pattern.finditer(text)]
     spans += [(m.start(), m.end(), "CODE") for m in re.finditer(r"(?<!\d)\d{6}(?!\d)", text)]
-    spans += [(m.start(), m.end(), "ID4") for m in lx.FOUR_DIGITS_RE.finditer(text)
-              if not 1900 <= int(m.group(0)) <= 2100]
+    for m in lx.FOUR_DIGITS_RE.finditer(text):
+        cue = lx.ID_WORD_RE.search(text[max(0, m.start() - 30):m.start()])
+        if cue or not 1900 <= int(m.group(0)) <= 2100:  # after an ID cue, any value (even "1987") is an ID
+            spans.append((m.start(), m.end(), "ID4"))
     chosen: list[tuple[int, int, str]] = []
     for span in sorted(spans, key=lambda s: (s[0], -(s[1] - s[0]))):
         if not chosen or span[0] >= chosen[-1][1]:

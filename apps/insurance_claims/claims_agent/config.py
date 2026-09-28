@@ -147,7 +147,7 @@ class Settings:
             max_clarifications=_int_env("MAX_CLARIFICATIONS", 3),
             lockout_failures=_int_env("LOCKOUT_FAILURES", 5),
             require_knowledge_factor=_bool_env("REQUIRE_KNOWLEDGE_FACTOR", False),
-            debug_panel=_bool_env("DEBUG_PANEL", mode == "rules" or os.environ.get("APP_ENV", "dev") == "dev"),
+            debug_panel=_bool_env("DEBUG_PANEL", os.environ.get("APP_ENV") == "dev"),
             session_ttl_minutes=_int_env("SESSION_TTL_MINUTES", 30),
             guard_enabled=_bool_env("GUARD_ENABLED", True),
             presidio_scan=_bool_env("PRESIDIO_SCAN", True),

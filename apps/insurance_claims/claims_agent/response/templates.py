@@ -30,6 +30,8 @@ ESCALATION_LEADS = {
                   "colleague.",
     "document_alternatives_exhausted": "Since the usual alternatives aren't available, a claims representative "
                                        "should review the file with you. I'm connecting you now.",
+    "otp_unavailable": "No problem. Since the code isn't reachable, I'm connecting you with a colleague who can "
+                       "verify you another way.",
     "deadline_review": "Of course. Since the appeal deadline has passed, I'm connecting you with a claims "
                        "representative who can review your options.",
     "representative_consent_timeout": "I wasn't able to confirm the policyholder's authorization, so I'm "
@@ -170,8 +172,12 @@ def _escalate(ctx: ResponseContext) -> str:
 
 def _resume(ctx: ResponseContext) -> str:
     field = ctx.details.get("resume_field")
-    text = (f" To continue, could you share {FIELD_LABELS[field]}?" if field and not ctx.verified
-            else " If you'd like, we can continue with your claim.")
+    if field == "otp" and not ctx.verified:
+        text = " To continue, please read me the 6-digit code we sent to the contact details on file."
+    elif field in FIELD_LABELS and not ctx.verified:
+        text = f" To continue, could you share {FIELD_LABELS[field]}?"
+    else:
+        text = " If you'd like, we can continue with your claim."
     if ctx.details.get("offer_human"):
         text += " If there's something else you need, I can also connect you with a member of our team."
     return text
@@ -185,9 +191,10 @@ RENDERERS = {
     A.ASK_FIELDS: _ask_fields,
     A.OFFER_ALT_FIELD: _offer_alt,
     A.VERIFY_FAILED: lambda ctx: GENERIC_FAILURE,
-    A.OTP_SENT: lambda ctx: ("That's okay, we can confirm it's you another way. If the details you've shared "
-                             "match our records, I've just sent a 6-digit code to the contact details on file. "
-                             "Please read the code back to me."),
+    A.OTP_SENT: lambda ctx: (("I've sent a new code. " if ctx.details.get("resent") else
+                              "That's okay, we can confirm it's you another way. ")
+                             + "If the details you've shared match our records, a 6-digit code is on its way to the "
+                             "contact details on file. Please read the code back to me."),
     A.OTP_WRONG: lambda ctx: "That code didn't match. Please check it and read it to me again.",
     A.OTP_REMIND: lambda ctx: "Please read me the 6-digit code we sent to the contact details on file.",
     A.CONFIRM_CONFLICT: lambda ctx: f"I heard two different values for {FIELD_LABELS[ctx.details['field']]}. "

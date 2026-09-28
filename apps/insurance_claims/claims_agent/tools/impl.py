@@ -125,12 +125,12 @@ def build_summary(reg, state: ConversationState) -> ToolResult:
     return ToolResult(ok=True, facts=(fact,), data={"subject": summary.subject, "body": summary.body})
 
 
-def send_otp(reg, state: ConversationState) -> ToolResult:
+def send_otp(reg, state: ConversationState, suppress_delivery: bool = False) -> ToolResult:
     """Route a code to the on-file email of the record matching every supplied factor (if any).
 
-    The result is identical whether or not a record matched: the caller learns nothing.
+    The result is identical whether or not a record matched (or delivery was suppressed for a locked record).
     """
-    party = reg.verifier.partial_match(state)
+    party = None if suppress_delivery else reg.verifier.partial_match(state)
     person = reg.repo.policyholder(party) if party else None
     reg.otp.issue(state.session_id, party, person.email if person else None)
     return ToolResult(ok=True, data={"issued": True})
@@ -138,7 +138,8 @@ def send_otp(reg, state: ConversationState) -> ToolResult:
 
 def verify_otp(reg, state: ConversationState, code: str = "") -> ToolResult:
     status, party = reg.otp.check(state.session_id, code)
-    return ToolResult(ok=status == "ok", data={"status": status, "party_id": party})
+    ok = status == "ok"
+    return ToolResult(ok=ok, data={"status": status, "party_id": party if ok else None, "candidate": party})
 
 
 def accept_channel_assertion(reg, state: ConversationState, token: str = "") -> ToolResult:

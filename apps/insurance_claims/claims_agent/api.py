@@ -48,6 +48,10 @@ def _public_event(event) -> dict:
     data = event.model_dump(mode="json")
     if "violations" in data["detail"]:
         data["detail"] = {"count": len(data["detail"]["violations"])}
+    if data["kind"] == "guard_scored":  # exact classifier scores would help attackers tune around the guard
+        detail = data["detail"]
+        data["detail"] = {"flagged": bool(detail.get("social_engineering")
+                                          or (detail.get("injection_score") or 0) >= 0.9)}
     return data
 
 
@@ -95,7 +99,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return out
 
     @app.post("/api/reset")
-    def reset(response: Response, sid: str | None = Cookie(default=None)) -> dict:
+    def reset(request: Request, response: Response, sid: str | None = Cookie(default=None)) -> dict:
+        client = request.client.host if request.client else "unknown"
+        if _rate_limited(f"create:{client}", settings.session_create_limit):
+            raise HTTPException(status_code=429, detail="Too many new conversations. Please wait a minute.")
         if sid:
             agent.sessions.drop(sid)
         _set_cookie(response, agent.new_session())

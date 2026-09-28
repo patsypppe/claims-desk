@@ -61,12 +61,12 @@ class MockOtpService:
             return "none", None
         if self._now() > record.expires_at:
             self._records.pop(session_id, None)
-            return "expired", None
+            return "expired", record.party_id  # internal: lets the controller count the failure per record
         record.attempts += 1
         if record.code is not None and secrets.compare_digest(code, record.code):
             self._records.pop(session_id, None)
             return "ok", record.party_id
         if record.attempts >= self.max_attempts:
             self._records.pop(session_id, None)
-            return "exhausted", None
+            return "exhausted", record.party_id
         return "wrong", None

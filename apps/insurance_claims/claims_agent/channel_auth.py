@@ -38,10 +38,10 @@ class ChannelVerifier:
     def verify(self, token: str) -> str | None:
         try:
             payload, signature = token.split(".")
-            if not hmac.compare_digest(signature, _sign(payload, self._key)):
+            if not hmac.compare_digest(signature.encode("utf-8"), _sign(payload, self._key).encode("utf-8")):
                 return None
             claims = json.loads(_unb64(payload))
-        except (ValueError, json.JSONDecodeError):
+        except (ValueError, TypeError, UnicodeError, json.JSONDecodeError):
             return None
         if claims.get("exp", 0) < self._now() or claims.get("nonce") in self._seen:
             return None

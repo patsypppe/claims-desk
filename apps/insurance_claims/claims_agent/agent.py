@@ -1,6 +1,7 @@
 """Turn pipeline: extract -> remember -> control -> tools -> context -> respond -> validate."""
 import os
 import threading
+import weakref
 from datetime import date
 
 from claims_agent.audit import AuditEvent
@@ -45,19 +46,22 @@ class Agent:
         self.repo, self.settings, self.clock, self.controller = repo, settings, clock, controller
         self.extraction_llm, self.responder, self.sessions, self.validator = extraction_llm, responder, sessions, validator
         self.use_llm = not isinstance(extraction_llm, NullLLM)
-        self._locks: dict[str, threading.Lock] = {}
+        self._locks: "weakref.WeakValueDictionary[str, threading.Lock]" = weakref.WeakValueDictionary()
         self._locks_guard = threading.Lock()
 
     def _session_lock(self, session_id: str) -> threading.Lock:
         with self._locks_guard:
-            return self._locks.setdefault(session_id, threading.Lock())
+            lock = self._locks.get(session_id)
+            if lock is None:
+                lock = threading.Lock()
+                self._locks[session_id] = lock
+            return lock
 
     def new_session(self, channel_token: str | None = None) -> str:
         return self.sessions.create(channel_token=channel_token)
 
-    def _llm_analysis(self, state, text: str, events: list) -> TurnAnalysis | None:
+    def _llm_analysis(self, state, redaction, events: list) -> TurnAnalysis | None:
         """Only redacted text reaches the provider; placeholders are restored deterministically."""
-        redaction = redact(text, self.clock.today())
         llm = LLMExtractor(self.extraction_llm).analyze(
             redaction.text, phase=state.phase.value, expected_field=state.expected_field,
             offer_pending=state.offer_id is not None and state.consent.value == "OFFERED")
@@ -72,14 +76,15 @@ class Agent:
         rules = RuleExtractor(today=today).analyze(text, state.expected_field)
         pre_events: list[AuditEvent] = []
         use_llm = self.use_llm and not sensitive  # secure-field turns never leave the server
-        llm = self._llm_analysis(state, text, pre_events) if use_llm else None
+        redaction = redact(text, today)  # computed ONCE; every provider-bound call gets only redaction.text
+        llm = self._llm_analysis(state, redaction, pre_events) if use_llm else None
         merged, events = merge(rules=rules, llm=llm, text=text, today=today, turn=state.turn)
         events = pre_events + events
         degraded = use_llm and llm is None
         if degraded:
             events.append(AuditEvent(kind="llm_degraded", detail={"stage": "extraction"}, turn=state.turn))
         if not sensitive:
-            merged = self._apply_guard(merged, text, state.turn, events)
+            merged = self._apply_guard(merged, redaction.text, state.turn, events)
         return merged, events, degraded
 
     def _apply_guard(self, analysis: TurnAnalysis, text: str, turn: int, events: list) -> TurnAnalysis:
@@ -121,7 +126,9 @@ class Agent:
         return reply, cited, events
 
     def handle(self, session_id: str, text: str, sensitive: bool = False) -> TurnResult:
-        with self._session_lock(session_id):  # one turn at a time per session: no lost updates / double sends
+        self.sessions.get(session_id)  # unknown/expired ids are rejected before any per-session resource exists
+        lock = self._session_lock(session_id)
+        with lock:  # one turn at a time per session: no lost updates / double sends
             return self._handle(session_id, text, sensitive)
 
     def _repeat(self, state, events: list) -> TurnResult:

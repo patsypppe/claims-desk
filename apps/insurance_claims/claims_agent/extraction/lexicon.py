@@ -102,7 +102,11 @@ SUBJECT_RE = re.compile(r"(?i:on behalf of|calling for|calling about|for)\s+(?i:
 SELF_RELATION_RE = re.compile(r"\bi'?m (?:her|his|their) (\w+)", re.I)
 SUBJECT_RELATION_RE = re.compile(r"\bmy (mother|mom|mum|father|dad|parent|wife|husband|spouse|son|daughter)\b", re.I)
 SUBJECT_NAME_RE = re.compile(r"\b(?i:her|his|their) name is ([A-Z][a-zA-Z'-]+\s+[A-Z][a-zA-Z'-]+)")
-REPEAT_RE = re.compile(r"(repeat that|say that again|come again|what did you (just )?say|pardon\??$|"
-                       r"didn'?t (quite )?catch that|one more time)", re.I)
-START_OVER_RE = re.compile(r"(start (over|again|fresh)|begin again|from the (top|beginning)|restart)", re.I)
-SKIP_RE = re.compile(r"(skip (this|that|it)( one| question)?|next question|pass on (this|that))", re.I)
+REPEAT_RE = re.compile(r"^\W*(?:sorry[,.]?\s*|um+[,.]?\s*)?(?:(?:can|could) you |please )?(?:repeat that|say that "
+                       r"again|come again|pardon(?: me)?)\b|^\W*(?:sorry[,.]?\s*)?(?:i )?didn'?t (?:quite )?catch that",
+                       re.I)
+START_OVER_RE = re.compile(r"^\W*(?:actually[,.]?\s*|ok(?:ay)?[,.]?\s*|so[,.]?\s*)?(?:(?:let'?s|can we|could we|"
+                           r"i(?:'d)? (?:want|like) to|please)\s+)?(?:start (?:over|again|fresh)|begin again|restart)\b",
+                           re.I)
+SKIP_RE = re.compile(r"^\W*(?:(?:can|could) we |let'?s |please |i'?d like to )?(?:skip (?:this|that|it)(?: one| "
+                     r"question)?|next question|pass on (?:this|that))\b", re.I)

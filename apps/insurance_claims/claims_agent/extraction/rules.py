@@ -31,7 +31,7 @@ class RuleExtractor:
             scope=self._scope(text),
             emotion=self._emotion(text),
             consent_signal=self._consent(text),
-            requested_action=self._action(text),
+            requested_action=self._action(text, has_data=bool(pii) or bool(re.search(r"\d{4}", text))),
             tool_requests=[ToolRequest(name="search_claims")] if lx.TOOL_REQUEST_RE.search(text) else [],
             injection_suspected=bool(lx.INJECTION_RE.search(text)),
         )
@@ -183,10 +183,11 @@ class RuleExtractor:
         return "YES" if yes else "NO" if no else "NONE"
 
     @staticmethod
-    def _action(text: str) -> str:
-        for action, pattern in (("repeat", lx.REPEAT_RE), ("start_over", lx.START_OVER_RE), ("skip", lx.SKIP_RE)):
-            if pattern.search(text):
-                return action
+    def _action(text: str, has_data: bool = False) -> str:
+        if not has_data and len(text.split()) <= 10:  # repairs are short, standalone utterances
+            for action, pattern in (("repeat", lx.REPEAT_RE), ("start_over", lx.START_OVER_RE), ("skip", lx.SKIP_RE)):
+                if pattern.search(text):
+                    return action
         if lx.HUMAN_RE.search(text):
             return "request_human"
         if lx.OTHER_EMAIL_RE.search(text):
