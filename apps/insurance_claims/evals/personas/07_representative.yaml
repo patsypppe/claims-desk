@@ -1,0 +1,7 @@
+id: representative_david
+description: David Chen, Margaret Chen's son, calling for his mother, polite.
+goal: Help your mother understand her denied January healthcare claim.
+known_facts: {your_name: David Chen, relationship: son, policyholder: Margaret Chen, her_dob: 1985-03-15, her_ssn_last4: "4472"}
+style: polite, explains he is calling on behalf of his mother
+success: {verified: true, verification_method: representative}
+expected_party: P9

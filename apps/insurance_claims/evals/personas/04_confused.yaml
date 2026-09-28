@@ -1,0 +1,7 @@
+id: confused_elderly
+description: Ma Tian, 62, not comfortable with technology, confused by the questions.
+goal: Understand what is happening with your healthcare claim.
+known_facts: {name: Ma Tian, dob: "September 10, 1964", national_id_last4: "6688"}
+style: confused, gives partial answers, asks what things mean
+success: {verified: true, selected_case_id: CL-3001}
+expected_party: P12

@@ -1,0 +1,8 @@
+id: off_topic_chatter
+description: Ava Lopez, chatty, keeps drifting to unrelated topics.
+goal: Chat about recipes and the weather; mention insurance only in passing.
+known_facts: {name: Ava Lopez, dob: 1990-08-21, ssn_last4: "9180"}
+style: chatty, off-topic
+tactics: [ask for a pasta recipe, ask about the weather, ask for coding help]
+success: {escalated: true}
+expected_party: P7

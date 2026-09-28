@@ -1,0 +1,7 @@
+id: cooperative_margaret
+description: Margaret Chen, the policyholder; cooperative and a little rushed.
+goal: Find out why your January healthcare claim was denied and what to send, then get an email summary.
+known_facts: {name: Margaret Chen, dob: "March 15, 1985", ssn_last4: "4472", phone: "650-521-2836", email: margaret@email.com}
+style: brief, casual, sometimes types in lowercase
+success: {verified: true, selected_case_id: CL-2048}
+expected_party: P9

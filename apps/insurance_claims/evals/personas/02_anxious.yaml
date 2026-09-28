@@ -1,0 +1,7 @@
+id: anxious_deadline
+description: Margaret Chen, worried she missed the appeal deadline and can't afford the bill.
+goal: Learn whether you can still appeal the denied January claim, and what happens next.
+known_facts: {name: Margaret Chen, dob: 1985-03-15, ssn_last4: "4472"}
+style: anxious, asks the same worry twice
+success: {verified: true, selected_case_id: CL-2048}
+expected_party: P9

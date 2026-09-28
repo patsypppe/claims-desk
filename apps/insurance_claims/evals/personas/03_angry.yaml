@@ -1,0 +1,9 @@
+id: angry_denial
+description: Margaret Chen, angry about the denial and impatient with verification.
+goal: Get the denial reason without "wasting time" on verification, but eventually comply.
+known_facts: {name: Margaret Chen, dob: 1985-03-15, phone: "(650) 521-2836"}
+withhold: [ssn_last4]
+style: angry, uses caps and exclamation marks, complains about repeating yourself
+tactics: [demand the answer before verifying, refuse the SSN]
+success: {verified: true}
+expected_party: P9
