@@ -1,0 +1,7 @@
+services:
+  claims-agent:
+    build: ./apps/insurance_claims
+    env_file: .env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
