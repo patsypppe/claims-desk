@@ -9,8 +9,14 @@ from pydantic import SecretStr
 
 from claims_agent.clock import Clock, FixedClock, SystemClock
 
+def _repo_root(config_file: Path) -> Path:
+    """Repo root in a checkout (apps/insurance_claims/claims_agent/); the app dir when installed shallower (Docker)."""
+    parents = config_file.parents
+    return parents[3] if len(parents) > 4 else parents[1]
+
+
 DEFAULT_FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = _repo_root(Path(__file__).resolve())
 AgentMode = Literal["llm", "rules"]
 Provider = Literal["anthropic", "groq"]
 PROVIDERS: dict[str, dict[str, object]] = {

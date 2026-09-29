@@ -119,3 +119,18 @@ def test_explicit_provider_wins_over_key_detection(monkeypatch, no_provider_env)
     monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
     with pytest.raises(ConfigError, match="ANTHROPIC_API_KEY"):
         Settings.from_env()
+
+
+# Docker: the package lives at /app/claims_agent, too shallow for the repo layout; import must not crash
+def test_repo_root_in_a_shallow_container_layout():
+    from pathlib import Path
+
+    from claims_agent.config import _repo_root
+    assert _repo_root(Path("/app/claims_agent/config.py")) == Path("/app")
+
+
+def test_repo_root_in_the_repo_layout():
+    from pathlib import Path
+
+    from claims_agent.config import _repo_root
+    assert _repo_root(Path("/r/apps/insurance_claims/claims_agent/config.py")) == Path("/r")
