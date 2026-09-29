@@ -116,6 +116,8 @@ def _merge_intent(rules: IntentHintsIn, llm: IntentHintsIn, text: str, turn: int
 def _merge_consent(rules: str, llm: str) -> str:
     if rules == llm:
         return rules
+    if rules == "AMBIGUOUS":
+        return "AMBIGUOUS"  # a hedge the rules can see ("hmm ok maybe") gets a clarification, not an LLM verdict
     if llm == "YES" and rules == "NONE":
         return "AMBIGUOUS"  # consent is an action gate: an affirmative must also be visible to the rules
     if "NO" in (rules, llm) and "YES" not in (rules, llm):

@@ -144,3 +144,12 @@ def test_spelled_correction_after_misheard_name_verifies_live_shape(repo):
     sid = agent.new_session()
     agent.handle(sid, "hi its margret chen, born 3/15/85, last 4 of social 4472, calling bout that jan claim")
     assert agent.handle(sid, "sorry thats Margaret, M-A-R-G-A-R-E-T").snapshot.verified
+
+
+def test_hedged_consent_reply_is_clarified_even_if_llm_reads_it_as_no():
+    # live qwen probe C09: "hmm ok maybe" -> LLM NO closed the email offer; spec: ambiguous -> one clarification
+    assert M("hmm ok maybe", TurnAnalysis(consent_signal="NO")).consent_signal == "AMBIGUOUS"
+
+
+def test_clear_no_still_declines():
+    assert M("No, don't send anything.", TurnAnalysis(consent_signal="NO")).consent_signal == "NO"
