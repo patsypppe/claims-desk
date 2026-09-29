@@ -153,3 +153,13 @@ def test_hedged_consent_reply_is_clarified_even_if_llm_reads_it_as_no():
 
 def test_clear_no_still_declines():
     assert M("No, don't send anything.", TurnAnalysis(consent_signal="NO")).consent_signal == "NO"
+
+
+@pytest.mark.parametrize("text", ["hmm ok maybe", "yeah I guess"])
+def test_llm_done_does_not_override_a_visible_consent_answer(text):
+    # live qwen replay C09: LLM requested_action=done on "hmm ok maybe" declined the email offer
+    assert M(text, TurnAnalysis(requested_action="done", consent_signal="YES")).requested_action != "done"
+
+
+def test_llm_done_paraphrase_still_accepted():
+    assert M("I think that covers it", TurnAnalysis(requested_action="done")).requested_action == "done"

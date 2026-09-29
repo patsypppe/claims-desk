@@ -131,7 +131,7 @@ EMAIL_EVIDENCE_RE = re.compile(r"[\w.+-]+@[\w-]+\.|\b(other|different|another|ne
                                re.I)
 
 
-def _merge_action(rules: str, llm: str, text: str, injection: bool) -> str:
+def _merge_action(rules: str, llm: str, text: str, injection: bool, rules_consent: str = "NONE") -> str:
     """High-impact actions need deterministic corroboration; an LLM label alone never escalates or re-routes."""
     if rules in ("repeat", "start_over", "skip"):
         return rules
@@ -139,7 +139,7 @@ def _merge_action(rules: str, llm: str, text: str, injection: bool) -> str:
         return "request_human"
     if "request_other_email" == rules or (llm == "request_other_email" and EMAIL_EVIDENCE_RE.search(text)):
         return "request_other_email"
-    if rules == "done" or (llm == "done" and "?" not in text):
+    if rules == "done" or (llm == "done" and "?" not in text and rules_consent not in ("YES", "AMBIGUOUS")):
         return "done"
     if llm in ("provide_info", "ask_question", "other"):
         return rules if rules in ("provide_info", "ask_question") else llm
@@ -197,7 +197,7 @@ def merge(*, rules: TurnAnalysis, llm: TurnAnalysis | None, text: str, today: da
         scope=_merge_scope(rules, llm, text, pii), emotion=llm.emotion,
         consent_signal=_merge_consent(rules.consent_signal, llm.consent_signal),
         requested_action=_merge_action(rules.requested_action, llm.requested_action, text,
-                                       rules.injection_suspected or llm.injection_suspected),
+                                       rules.injection_suspected or llm.injection_suspected, rules.consent_signal),
         tool_requests=rules.tool_requests + [t for t in llm.tool_requests
                                              if t.name not in {r.name for r in rules.tool_requests}],
         injection_suspected=rules.injection_suspected or llm.injection_suspected,
