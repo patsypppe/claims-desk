@@ -1,7 +1,10 @@
 services:
   claims-agent:
     build: ./apps/insurance_claims
-    env_file: .env
+    image: claims-desk:latest
+    env_file:
+      - path: .env
+        required: false
     environment:
       STORAGE: sqlite
       SQLITE_PATH: /data/claims_agent.db

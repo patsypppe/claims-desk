@@ -95,3 +95,27 @@ def test_dotenv_loaded_without_overriding_real_env(monkeypatch, tmp_path, no_pro
     import os
     assert os.environ["AI_PROVIDER"] == "groq" and os.environ["AGENT_MODE"] == "llm" and os.environ["QUOTED"] == "x y"
     monkeypatch.delenv("QUOTED")
+
+
+# Zero-config setup: paste one key and go; no key runs the deterministic mode instead of crashing
+def test_no_mode_and_no_key_runs_rules(no_provider_env):
+    assert Settings.from_env().agent_mode == "rules"
+
+
+def test_no_mode_with_anthropic_key_runs_llm_on_anthropic(monkeypatch, no_provider_env):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    s = Settings.from_env()
+    assert (s.agent_mode, s.provider) == ("llm", "anthropic")
+
+
+def test_only_a_groq_key_selects_groq(monkeypatch, no_provider_env):
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
+    s = Settings.from_env()
+    assert (s.agent_mode, s.provider, s.model) == ("llm", "groq", "openai/gpt-oss-120b")
+
+
+def test_explicit_provider_wins_over_key_detection(monkeypatch, no_provider_env):
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
+    with pytest.raises(ConfigError, match="ANTHROPIC_API_KEY"):
+        Settings.from_env()

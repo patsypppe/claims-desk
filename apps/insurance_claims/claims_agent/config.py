@@ -118,10 +118,14 @@ class Settings:
     def from_env(cls, dotenv: Path | None = None) -> "Settings":
         if os.environ.get("CLAIMS_AGENT_SKIP_DOTENV") != "1":
             load_dotenv(dotenv or REPO_ROOT / ".env")
-        mode = os.environ.get("AGENT_MODE", "llm").strip().lower()
+        has_key = {name: bool(os.environ.get(name)) for name in ("ANTHROPIC_API_KEY", "GROQ_API_KEY", "AI_API_KEY")}
+        # Unset mode: use the model when any key is present, otherwise the deterministic no-key mode.
+        mode = (os.environ.get("AGENT_MODE") or ("llm" if any(has_key.values()) else "rules")).strip().lower()
         if mode not in ("llm", "rules"):
             raise ConfigError(f"AGENT_MODE must be 'llm' or 'rules', got {mode!r}")
-        provider = (os.environ.get("AI_PROVIDER") or "anthropic").strip().lower()
+        # Unset provider: a lone Groq key means Groq; everything else keeps the Anthropic default.
+        detected = "groq" if has_key["GROQ_API_KEY"] and not has_key["ANTHROPIC_API_KEY"] else "anthropic"
+        provider = (os.environ.get("AI_PROVIDER") or detected).strip().lower()
         if provider not in PROVIDERS:
             raise ConfigError(f"AI_PROVIDER must be one of {sorted(PROVIDERS)}, got {provider!r}")
         key_names = PROVIDERS[provider]["keys"]

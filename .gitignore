@@ -10,3 +10,4 @@ apps/insurance_claims/evals/reports/
 .DS_Store
 *.egg-info/
 data/
+claims-desk-image*.tar.gz
