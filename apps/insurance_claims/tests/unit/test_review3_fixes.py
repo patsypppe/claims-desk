@@ -162,3 +162,11 @@ def test_eval_suite_accepts_a_comma_separated_list_of_ids_and_categories():
     got = load_scenarios(Path("evals/scenarios"), "m1_margaret_sample,v1_three_factors_no_intent,escalation")
     ids = {s.id for s in got}
     assert {"m1_margaret_sample", "v1_three_factors_no_intent"} <= ids and any(s.category == "escalation" for s in got)
+
+
+def test_long_suite_lists_get_a_short_filesystem_safe_report_label():
+    from evals.cli import suite_label
+    long = ",".join(f"scenario_{i:02d}_with_a_long_descriptive_name" for i in range(15))
+    label = suite_label(long)
+    assert len(label) <= 40 and "," not in label and label == suite_label(long)
+    assert suite_label("injection") == "injection"

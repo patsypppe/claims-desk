@@ -45,6 +45,16 @@ def _judge(results) -> dict:
     return {"numerator": None, "denominator": None, "value": summary}
 
 
+def suite_label(suite: str) -> str:
+    """Report-directory label: a comma-separated list becomes "subset<N>-<hash>" (paths have length limits)."""
+    if "," not in suite:
+        return suite
+    import hashlib
+
+    names = [w for w in suite.split(",") if w.strip()]
+    return f"subset{len(names)}-{hashlib.sha1(suite.encode()).hexdigest()[:8]}"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agent", choices=["final", "baseline"], default="final")
@@ -65,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
     metrics = compute_metrics(results)
     if args.judge:
         metrics["judge"] = _judge(results)
-    label = f"{args.agent}-{args.mode}-{args.suite}" + ("-novalidator" if args.no_validator else "") + (
+    label = f"{args.agent}-{args.mode}-{suite_label(args.suite)}" + ("-novalidator" if args.no_validator else "") + (
         "-noguard" if args.no_guard else "") + ("-leaky" if args.leaky_responder else "")
     out = write_report(results, metrics, label, EVALS_DIR / "reports")
     print(f"{sum(r.passed for r in results)}/{len(results)} scenarios passed — report: {out / 'report.md'}")
