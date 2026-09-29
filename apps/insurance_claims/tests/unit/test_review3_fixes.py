@@ -154,3 +154,11 @@ def test_representative_hears_about_the_policyholders_account_not_their_own(agen
     [r] = talk(agent, "I'm David Chen, calling on behalf of my mother Margaret Chen. Her DOB is 1985-03-15 and her "
                       "SSN last four is 4472.")
     assert r.snapshot.verified and "your account" not in r.reply and "policyholder's account" in r.reply
+
+
+def test_eval_suite_accepts_a_comma_separated_list_of_ids_and_categories():
+    from evals.scenario import load_scenarios
+    from pathlib import Path
+    got = load_scenarios(Path("evals/scenarios"), "m1_margaret_sample,v1_three_factors_no_intent,escalation")
+    ids = {s.id for s in got}
+    assert {"m1_margaret_sample", "v1_three_factors_no_intent"} <= ids and any(s.category == "escalation" for s in got)

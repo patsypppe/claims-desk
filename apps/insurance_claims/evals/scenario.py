@@ -57,4 +57,5 @@ def load_scenarios(directory: Path, suite: str = "all") -> list[Scenario]:
     scenarios = [Scenario.model_validate(yaml.safe_load(f.read_text())) for f in files]
     if suite == "all":
         return scenarios
-    return [s for s in scenarios if s.category == suite or suite in s.tags]
+    wanted = {w.strip() for w in suite.split(",") if w.strip()}  # ids, categories or tags, comma-separated
+    return [s for s in scenarios if s.id in wanted or s.category in wanted or wanted & set(s.tags)]
