@@ -127,3 +127,20 @@ def test_llm_my_mother_is_the_subjects_relation_not_the_callers():
 def test_llm_stated_caller_relationship_is_kept():
     text = "I'm her son David Chen, calling about my mother's claim."
     assert M(text, TurnAnalysis(speaker_role="third_party", stated_relationship="son")).stated_relationship == "son"
+
+
+def test_llm_name_with_spelled_letters_is_cleaned_to_the_name():
+    # live qwen replay C02: name "Margaret, M-A-R-G-A-R-E-T" was stored as a two-token full name, dropping the surname
+    text = "sorry thats Margaret, M-A-R-G-A-R-E-T"
+    llm = TurnAnalysis(pii_candidates=[PiiCandidate(field="name", raw_value="Margaret, M-A-R-G-A-R-E-T", is_correction=True)])
+    assert [c.raw_value for c in M(text, llm).pii_candidates if c.field == "name"] == ["Margaret"]
+
+
+def test_spelled_correction_after_misheard_name_verifies_live_shape(repo):
+    agent = build_agent_for_eval(repo=repo, mode="fake", today=TODAY, scripted_analyses=[
+        {"pii_candidates": [{"field": "name", "raw_value": "margret chen"}, {"field": "dob", "raw_value": "3/15/85"},
+                            {"field": "id_last4", "raw_value": "4472"}]},
+        {"pii_candidates": [{"field": "name", "raw_value": "Margaret, M-A-R-G-A-R-E-T", "is_correction": True}]}])
+    sid = agent.new_session()
+    agent.handle(sid, "hi its margret chen, born 3/15/85, last 4 of social 4472, calling bout that jan claim")
+    assert agent.handle(sid, "sorry thats Margaret, M-A-R-G-A-R-E-T").snapshot.verified

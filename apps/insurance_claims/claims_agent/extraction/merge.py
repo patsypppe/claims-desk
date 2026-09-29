@@ -37,10 +37,22 @@ def _rejected(what: str, turn: int) -> AuditEvent:
     return AuditEvent(kind="llm_value_rejected", detail={"field": what, "reason": "not_in_caller_text"}, turn=turn)
 
 
+_SPELLED_RUN = re.compile(r"\b[A-Za-z](?:-[A-Za-z]){2,}\b")
+
+
+def _clean_llm_name(c: PiiCandidate) -> PiiCandidate:
+    """"Margaret, M-A-R-G-A-R-E-T" -> "Margaret": the spelling confirms the name, it is not a second name token."""
+    if c.field != "name" or not _SPELLED_RUN.search(c.raw_value):
+        return c
+    cleaned = " ".join(_SPELLED_RUN.sub(" ", c.raw_value).replace(",", " ").split())
+    return c.model_copy(update={"raw_value": cleaned or _SPELLED_RUN.search(c.raw_value)[0].replace("-", "").capitalize()})
+
+
 def _merge_pii(rules: list[PiiCandidate], llm: list[PiiCandidate], text: str, turn: int):
     events: list[AuditEvent] = []
     kept_llm = []
     for c in llm:
+        c = _clean_llm_name(c) if _in_text(c.raw_value, text) else c
         if c.caller_refused or _in_text(c.raw_value, text):
             kept_llm.append(c)
         else:
