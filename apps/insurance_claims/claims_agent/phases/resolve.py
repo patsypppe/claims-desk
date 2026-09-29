@@ -35,6 +35,10 @@ def _narrow(ctx: StepContext, state: ConversationState, claims) -> Decision:
     picked = pick_option(options, turn_hints(ctx), ctx.text)
     if picked:
         return select(ctx, state, picked)
+    if ctx.analysis.requested_action == "done":
+        from claims_agent.phases import post
+
+        return post.enter(ctx, state.model_copy(update={"candidate_case_ids": ()}))
     narrowed = resolve(pool, turn_hints(ctx))
     if narrowed.action == "PRESENT_CASE":
         return select(ctx, state, narrowed.case_id)
