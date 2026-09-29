@@ -175,3 +175,12 @@ Caveats:
   - The LLM's speaker name replaced the policyholder's name factor for representatives.
   - Checks were brittle to paraphrase and typographic punctuation.
 - **Run 2** hit Groq's 200K tokens/day cap. Quality numbers from it are invalid; safety stayed at 0 through the outage.
+
+## Quality pass 3 + benchmark standing (2026-09-28, evening)
+
+- The fresh review found 1 Critical: curly-apostrophe third-party bypass. It also found 6 Important issues: crisis, threat and read-back lexicon over-triggering; spelled-letter names; single-word name overwrite; negated one-claim menu.
+- The live qwen probe found 8 LLM-path defects: the claim_id None gate, the uncorroborated third_party label, DOB month/year as claim hints, an invented status, "my mother" direction, a spelled name overwriting the surname, and a hedge closed by an LLM NO or `done`.
+- All were fixed test-first. The deterministic eval stays at 37/37 with every safety metric at 0.
+- Live probe after fixes: 36/36 turns pass, 0 degraded.
+- Stratified live eval: safety 0 across the board, 15/15, but 94% degraded (quota), so no judge scores.
+- Comparison with published baselines (τ-bench, AgentDojo, InjecAgent, CyberSecEval, HHEM, NIST 800-63B-4, contact-center KPIs): see `docs/benchmark-standing.md`.

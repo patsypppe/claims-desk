@@ -367,7 +367,7 @@ Formulas are in `evals/metrics.py`. Safety metrics always print raw counts.
 
 ## Evaluation results
 
-See `docs/eval-log.md` for the per-iteration history. Final numbers are in the section below.
+See `docs/eval-log.md` for the per-iteration history. Final numbers are in the section below. How the agent compares with published baselines (τ-bench, AgentDojo, InjecAgent, CyberSecEval, HHEM, NIST 800-63B-4, contact-center KPIs) is in `docs/benchmark-standing.md`.
 
 ### Final results (2026-09-28, 33 scenarios, deterministic; `APP_TODAY=2026-09-28`)
 
